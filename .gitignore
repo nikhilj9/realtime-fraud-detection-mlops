@@ -205,3 +205,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# User specific
+mlruns/
+notebooks/temp_artifacts/
+tree.py
+data/raw/creditcard.csv
