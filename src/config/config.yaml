@@ -1,0 +1,85 @@
+# Fraud Detection Pipeline Configuration
+
+paths:
+  raw_data: "data/raw/creditcard.csv"
+  processed_data: "data/processed"
+  models: "models"
+  logs: "logs"
+
+split:
+  train_ratio: 0.6
+  val_ratio: 0.2
+  test_ratio: 0.2
+
+generation:
+  random_seed: 42
+  exchange_rate: 88.0
+  n_users: 10000
+  n_merchants: 5000
+  start_date: "2023-09-02"
+  output_filename: "transactions_enriched.parquet"
+
+distributions:
+  card_networks:
+    low_amount:
+      Visa: 0.30
+      Mastercard: 0.30
+      RuPay: 0.40
+      Amex: 0.00
+    mid_amount:
+      Visa: 0.45
+      Mastercard: 0.45
+      RuPay: 0.10
+      Amex: 0.00
+    high_amount:
+      Visa: 0.45
+      Mastercard: 0.45
+      RuPay: 0.02
+      Amex: 0.08
+
+  merchant_categories:
+    low_amount:
+      Grocery: 0.20
+      Fast Food: 0.20
+      Public Transport: 0.20
+      Fuel: 0.15
+      Digital Services: 0.15
+      Pharmacy: 0.05
+      Entertainment: 0.05
+    mid_amount:
+      Dining: 0.25
+      Fashion: 0.20
+      Supermarket: 0.15
+      Pharmacy: 0.10
+      Utility: 0.10
+      Fuel: 0.05
+      Entertainment: 0.05
+      Auto: 0.05
+      Personal Care: 0.05
+    high_amount:
+      Airline: 0.30
+      Hotel: 0.20
+      Electronics: 0.20
+      Jewelry: 0.10
+      Furniture: 0.10
+      Hospital: 0.10
+
+features:
+  amount_log_transform: true
+  time_features: true
+  target_encoding_smoothing: 10.0
+
+model:
+  model_type: "xgboost"
+  random_state: 42
+  n_estimators: 100
+  max_depth: 6
+  learning_rate: 0.1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  smote_ratio: 0.1
+
+mlflow:
+  experiment_name: "fraud-detection"
+  tracking_uri: "mlruns"
+  log_models: true

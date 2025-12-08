@@ -9,6 +9,7 @@ dependencies = [
     "imbalanced-learn>=0.14.0",
     "mlflow>=3.6.0",
     "prefect>=3.6.2",
+    "pytest>=9.0.1",
     "seaborn>=0.13.2",
     "shap==0.45.0",
     "tree>=0.2.4",

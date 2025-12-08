@@ -212,6 +212,6 @@ notebooks/temp_artifacts/
 tree.py
 
 # Large processed data (handled by DVC)
-data/raw/creditcard.csv
-data/processed/train_processed.parquet
-data/processed/transactions_enriched.parquet
+data/raw/*.csv
+data/processed/*.parquet
+models/*.joblib
