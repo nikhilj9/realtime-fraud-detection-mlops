@@ -209,9 +209,5 @@ __marimo__/
 # MLFlow
 mlruns/
 notebooks/temp_artifacts/
-tree.py
-
-# Large processed data (handled by DVC)
-data/raw/*.csv
-data/processed/*.parquet
-models/*.joblib
+tree.py/models/
+/models
