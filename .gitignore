@@ -209,5 +209,13 @@ __marimo__/
 # MLFlow
 mlruns/
 notebooks/temp_artifacts/
-tree.py/models/
-/models
+tree.py
+
+# Custom Project Rules
+logs/
+data/raw/*.csv
+data/processed/*.parquet
+data/processed/*.joblib
+models/*.joblib
+test_transaction.json
+tree.py

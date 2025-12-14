@@ -40,7 +40,14 @@ def load_split_data(
     X_val, y_val = val_df[features], val_df[target]
     X_test, y_test = test_df[features], test_df[target]
     
+    # Cast integer columns to float64 to handle missing values at inference
+    int_cols = X_train.select_dtypes(include=['int64', 'int32']).columns
+    X_train[int_cols] = X_train[int_cols].astype('float64')
+    X_val[int_cols] = X_val[int_cols].astype('float64')
+    X_test[int_cols] = X_test[int_cols].astype('float64')
+    
     logger.info(f"Train: {X_train.shape} | Val: {X_val.shape} | Test: {X_test.shape}")
+    logger.info(f"Converted {len(int_cols)} integer columns to float64")
     
     return X_train, y_train, X_val, y_val, X_test, y_test
 
@@ -178,7 +185,7 @@ def final_evaluation(
         
         # Log model
         signature = infer_signature(X_test.iloc[:5], model.predict(X_test.iloc[:5]))
-        mlflow.sklearn.log_model(model, "model", signature=signature)
+        mlflow.sklearn.log_model(model, name="model", signature=signature)
         
         logger.info(f"Run ID: {run.info.run_id}")
         

@@ -55,7 +55,7 @@ def run_pipeline(config: Config) -> None:
     
     # Step 6: Save Model
     logger.info("Step 6: Saving Model")
-    model_path = config.paths.models / "model.joblib"
+    model_path = config.paths.models / "champion_model.joblib"
     save_model(final_model, model_path)
     
     # Summary
