@@ -1,0 +1,22 @@
+# .dockerignore
+
+# Version Control
+.git
+.dvc
+.gitignore
+.dvcignore
+
+# Python/Environment
+__pycache__
+*.pyc
+.venv/
+.pytest_cache/
+logs/
+
+# Data
+data/raw/
+notebooks/
+tests/
+
+# README
+README.md

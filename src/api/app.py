@@ -1,11 +1,11 @@
 """FastAPI application for fraud detection."""
 
-import joblib
-from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+import joblib
+from pathlib import Path
 
-from src.utils.logger import get_logger
+from src.utils.logger import get_logger, log_session_start, log_session_end
 
 logger = get_logger(__name__)
 
@@ -17,32 +17,31 @@ FEATURE_COLUMNS_PATH = Path("data/processed/feature_columns.joblib")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load ML artifacts at startup."""
+    """Handle startup and shutdown."""
+    
+    # Startup
+    log_session_start(logger)
     logger.info("Starting up - loading model artifacts...")
     
-    # Load model
-    if not MODEL_PATH.exists():
-        raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
-    app.state.model = joblib.load(MODEL_PATH)
-    logger.info(f"Loaded model from {MODEL_PATH}")
-    
-    # Load target encoder
-    if ENCODER_PATH.exists():
-        app.state.encoder = joblib.load(ENCODER_PATH)
-        logger.info(f"Loaded encoder from {ENCODER_PATH}")
-    else:
-        app.state.encoder = None
-        logger.warning("Target encoder not found - will skip target encoding")
-    
-    # Load feature columns
-    if not FEATURE_COLUMNS_PATH.exists():
-        raise FileNotFoundError(f"Feature columns not found: {FEATURE_COLUMNS_PATH}")
-    app.state.feature_columns = joblib.load(FEATURE_COLUMNS_PATH)
-    logger.info(f"Loaded {len(app.state.feature_columns)} feature columns")
+    try:
+        app.state.model = joblib.load(Path("models/champion_model.joblib"))
+        logger.info("Loaded model from models/champion_model.joblib")
+        
+        app.state.encoder = joblib.load(Path("data/processed/target_encoder.joblib"))
+        logger.info("Loaded encoder from data/processed/target_encoder.joblib")
+        
+        app.state.feature_columns = joblib.load(Path("data/processed/feature_columns.joblib"))
+        logger.info(f"Loaded {len(app.state.feature_columns)} feature columns")
+        
+    except Exception as e:
+        logger.error(f"Failed to load artifacts: {e}")
+        raise
     
     yield
     
+    # Shutdown
     logger.info("Shutting down...")
+    log_session_end(logger)
 
 
 app = FastAPI(
@@ -51,7 +50,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
 
 @app.get("/health", tags=["Health"])
 async def health_check():

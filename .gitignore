@@ -219,3 +219,4 @@ data/processed/*.joblib
 models/*.joblib
 test_transaction.json
 tree.py
+/models

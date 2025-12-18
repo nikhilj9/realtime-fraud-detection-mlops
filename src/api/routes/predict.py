@@ -13,43 +13,33 @@ router = APIRouter(prefix="/api/v1", tags=["Predictions"])
 
 
 def engineer_features(transaction: TransactionRequest, encoder) -> pd.DataFrame:
-    """
-    Apply same feature engineering as training.
+    """Apply same feature engineering as training."""
     
-    Must match src/features/engineering.py exactly!
-    """
-    # Convert request to dict, then DataFrame
     data = transaction.model_dump()
     df = pd.DataFrame([data])
     
-    # === Direct features (already in request) ===
-    # card_tier, credit_limit, card_age, transaction_channel,
-    # is_international, is_recurring, V1-V28 are already present
-    
-    # === Amount features ===
-    df["amount_inr"] = df["amount"]  # Assuming amount is already in INR
+    # Amount features
+    df["amount_inr"] = df["amount"]
     df["log_amount"] = np.log1p(df["amount"])
     
-    # === Time features ===
+    # Time features
     df["hour"] = (df["time"] / 3600).astype(int) % 24
     df["day_of_week"] = ((df["time"] / 3600) / 24).astype(int) % 7
     df["is_night"] = df["hour"].apply(lambda h: 1 if h <= 6 or h >= 22 else 0)
     df["is_weekend"] = df["day_of_week"].apply(lambda d: 1 if d >= 5 else 0)
     
-    # === Interaction features ===
-    # intl_online: international + online channel
+    # Interaction features
     df["intl_online"] = (df["is_international"] == 1) & (df["transaction_channel"] == 1)
     df["intl_online"] = df["intl_online"].astype(int)
     
-    # night_high_amount: night transaction with high amount
-    high_amount_threshold = 5000  # Same as training
+    high_amount_threshold = 5000
     df["night_high_amount"] = (df["is_night"] == 1) & (df["amount"] > high_amount_threshold)
     df["night_high_amount"] = df["night_high_amount"].astype(int)
     
-    # === Target encoding ===
-    if encoder is not None and df["merchant_category"].notna().any():
+    # Target encoding
+    if encoder is not None and "merchant_category" in df.columns:
         try:
-            df["merchant_category_encoded"] = encoder.transform(df[["merchant_category"]])
+            df = encoder.transform(df)
         except Exception as e:
             logger.warning(f"Encoding failed for merchant_category: {e}, using 0")
             df["merchant_category_encoded"] = 0.0
@@ -60,7 +50,7 @@ def engineer_features(transaction: TransactionRequest, encoder) -> pd.DataFrame:
 
 
 def get_risk_level(probability: float) -> str:
-    """Convert probability to human-readable risk level."""
+    """Convert probability to risk level."""
     if probability < 0.3:
         return "low"
     elif probability < 0.7:
@@ -71,35 +61,25 @@ def get_risk_level(probability: float) -> str:
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_fraud(transaction: TransactionRequest, request: Request):
-    """
-    Predict if a transaction is fraudulent.
-    
-    Returns fraud probability and risk level.
-    """
+    """Predict if a transaction is fraudulent."""
     try:
-        # Get artifacts from app state
         model = request.app.state.model
         encoder = request.app.state.encoder
         feature_columns = request.app.state.feature_columns
         
-        # Engineer features
         df = engineer_features(transaction, encoder)
         
-        # Select and order columns to match training
         missing_cols = set(feature_columns) - set(df.columns)
         if missing_cols:
             logger.warning(f"Missing columns (setting to 0): {missing_cols}")
             for col in missing_cols:
                 df[col] = 0
         
-        # Select only required features in correct order
         X = df[feature_columns]
         
-        # Log for debugging
         logger.debug(f"Feature columns: {list(X.columns)}")
         logger.debug(f"Feature dtypes: {X.dtypes.to_dict()}")
         
-        # Predict
         fraud_probability = float(model.predict_proba(X)[0][1])
         is_fraud = fraud_probability >= 0.5
         risk_level = get_risk_level(fraud_probability)
@@ -116,17 +96,15 @@ async def predict_fraud(transaction: TransactionRequest, request: Request):
         logger.error(f"Prediction failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    
+
 @router.post("/debug", include_in_schema=False)
 async def debug_features(transaction: TransactionRequest, request: Request):
-    """Debug endpoint to see what features are created."""
+    """Debug endpoint to see generated features."""
     encoder = request.app.state.encoder
     feature_columns = request.app.state.feature_columns
     
-    # Engineer features
     df = engineer_features(transaction, encoder)
     
-    # Check dtypes
     dtypes_info = {
         "all_columns": list(df.columns),
         "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
@@ -135,14 +113,12 @@ async def debug_features(transaction: TransactionRequest, request: Request):
         "extra_features": list(set(df.columns) - set(feature_columns)),
     }
     
-    # Check for object/string dtypes
-    string_columns = [col for col in df.columns if df[col].dtype == 'object']
+    string_columns = [col for col in df.columns if df[col].dtype == "object"]
     dtypes_info["string_columns"] = string_columns
     
-    # Check what would be passed to model
     X = df[feature_columns] if all(col in df.columns for col in feature_columns) else None
     if X is not None:
         dtypes_info["X_dtypes"] = {col: str(dtype) for col, dtype in X.dtypes.items()}
-        dtypes_info["X_has_strings"] = any(X[col].dtype == 'object' for col in X.columns)
+        dtypes_info["X_has_strings"] = any(X[col].dtype == "object" for col in X.columns)
     
     return dtypes_info
