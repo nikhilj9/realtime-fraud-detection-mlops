@@ -1,13 +1,11 @@
 # tests/unit/test_model_evaluation.py
 """Tests for model evaluation utilities."""
 
-import pytest
 import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from pathlib import Path
 
 from src.models.evaluate import (
     calculate_metrics,

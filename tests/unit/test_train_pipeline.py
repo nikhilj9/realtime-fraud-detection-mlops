@@ -1,12 +1,9 @@
 # tests/unit/test_train_pipeline.py
 """Tests for production training pipeline."""
 
-import pytest
-import numpy as np
 import pandas as pd
 from pathlib import Path
-from unittest.mock import patch, MagicMock, call
-import joblib
+from unittest.mock import patch, MagicMock
 
 from src.pipelines.training_pipeline import run_pipeline, main
 

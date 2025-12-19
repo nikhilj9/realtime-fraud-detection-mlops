@@ -6,6 +6,7 @@ import joblib
 from pathlib import Path
 
 from src.utils.logger import get_logger, log_session_start, log_session_end
+from src.api.routes.predict import router as predict_router
 
 logger = get_logger(__name__)
 
@@ -56,7 +57,4 @@ async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
 
-
-# Include prediction router
-from src.api.routes.predict import router as predict_router
 app.include_router(predict_router)

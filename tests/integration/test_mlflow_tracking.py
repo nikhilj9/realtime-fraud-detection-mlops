@@ -2,12 +2,6 @@
 """Integration tests for MLflow experiment tracking."""
 
 import pytest
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-import tempfile
-
 import mlflow
 
 

@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from src.utils import Config, load_config, get_logger
-from src.utils.exceptions import DataGenerationError, DataLoadError
+from src.utils.exceptions import DataLoadError
 
 logger = get_logger(__name__)
 

@@ -5,12 +5,10 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
 import joblib
 
 from src.features.encoders import TargetEncoder
-from src.utils import Config, get_logger
-from src.utils.exceptions import FeatureEngineeringError 
+from src.utils import get_logger
 
 logger = get_logger(__name__)
 

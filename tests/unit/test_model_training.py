@@ -1,11 +1,9 @@
 # test_model_training.py
 """Tests for model training module."""
 
-import pytest
-import pandas as pd
 import numpy as np
 import joblib
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from src.models.train import (
     load_split_data,
@@ -111,7 +109,6 @@ class TestModelTraining:
         X_val = sample_val_df.drop(columns=["is_fraud"])
         y_val = sample_val_df["is_fraud"]
         model = retrain_on_train_val(X_train, y_train, X_val, y_val, mock_config)
-        expected_samples = len(X_train) + len(X_val)
         preds = model.predict(X_train)
         assert len(preds) == len(X_train), "Model must be able to predict on training data"
 

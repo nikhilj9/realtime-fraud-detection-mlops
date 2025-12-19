@@ -5,7 +5,6 @@ import sys
 import uuid
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Optional
 from contextvars import ContextVar
 
 # Stores the current request ID (thread-safe)
@@ -22,7 +21,8 @@ _LOGGERS = {}
 class UTCFormatter(logging.Formatter):
     """Formatter that always uses UTC timezone."""
     
-    converter = lambda *args: datetime.now(timezone.utc).timetuple()
+    def converter(*args):
+        return datetime.now(timezone.utc).timetuple()
     
     def format(self, record):
         # Add request ID to the record

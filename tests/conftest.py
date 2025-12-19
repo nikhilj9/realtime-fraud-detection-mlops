@@ -4,15 +4,15 @@
 import pytest
 import pandas as pd
 import numpy as np
-from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import patch, MagicMock
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import joblib
-import tempfile
 
+from fastapi.testclient import TestClient
+from src.api.app import app
 
 # =============================================================================
 # COMMON FIXTURES
@@ -324,3 +324,92 @@ def mlflow_tracking_uri(tmp_path):
     """Isolated MLflow tracking URI for testing."""
     uri = f"sqlite:///{tmp_path}/mlruns.db"
     return uri
+
+# =============================================================================
+# API / FASTAPI FIXTURES
+# =============================================================================
+
+@pytest.fixture
+def api_client():
+    """Client for calling API endpoints."""
+    return TestClient(app)
+
+@pytest.fixture
+def mock_model_artifact():
+    """Mock XGBoost/Sklearn model for unit tests."""
+    model = MagicMock()
+    # Mock predict_proba to return [0.8, 0.2] (not fraud)
+    model.predict_proba.return_value = np.array([[0.8, 0.2]]) 
+    return model
+
+@pytest.fixture
+def mock_encoder_artifact():
+    """Mock TargetEncoder for unit tests."""
+    encoder = MagicMock()
+    # Mock transform to return the same dataframe
+    encoder.transform.side_effect = lambda df: df
+    return encoder
+
+@pytest.fixture
+def mock_feature_columns():
+    """Mock feature columns list."""
+    return [
+        "amount_inr", "log_amount", "hour", "day_of_week", "is_night", 
+        "is_weekend", "intl_online", "night_high_amount", 
+        "merchant_category_encoded"
+    ] + [f"V{i}" for i in range(1, 29)]
+
+@pytest.fixture
+def client_with_mocks(mock_model_artifact, mock_encoder_artifact, mock_feature_columns):
+    """
+    TestClient that mocks the artifact loading (unit tests).
+    This prevents DVC files from being required.
+    """
+    # Patch joblib.load to return our mocks instead of reading files
+    with patch("src.api.app.joblib.load") as mock_load:
+        def side_effect(path):
+            path_str = str(path)
+            if "model" in path_str:
+                return mock_model_artifact
+            elif "encoder" in path_str:
+                return mock_encoder_artifact
+            elif "feature_columns" in path_str:
+                return mock_feature_columns
+            return MagicMock()
+            
+        mock_load.side_effect = side_effect
+        
+        # Create client inside the patch context
+        with TestClient(app) as client:
+            yield client
+
+@pytest.fixture
+def client_integration():
+    """
+    TestClient that uses REAL artifacts (Integration tests).
+    Requires DVC files to be present.
+    """
+    with TestClient(app) as client:
+        yield client
+
+@pytest.fixture
+def sample_transaction_payload():
+    """Valid transaction JSON payload."""
+    return {
+        "amount": 5000.0,
+        "time": 45623.0,
+        "card_tier": "Gold",
+        "credit_limit": 100000.0,
+        "card_age": 365,
+        "transaction_channel": "Online",
+        "is_international": 0,
+        "is_recurring": 0,
+        "merchant_category": "electronics",
+        "V1": -1.359807, "V2": -0.072781, "V3": 2.536347, "V4": 1.378155,
+        "V5": -0.338321, "V6": 0.462388, "V7": 0.239599, "V8": 0.098698,
+        "V9": 0.363787, "V10": 0.090794, "V11": -0.551600, "V12": -0.617801,
+        "V13": -0.991390, "V14": -0.311169, "V15": 1.468177, "V16": -0.470401,
+        "V17": 0.207971, "V18": 0.025791, "V19": 0.403993, "V20": 0.251412,
+        "V21": -0.018307, "V22": 0.277838, "V23": -0.110474, "V24": 0.066928,
+        "V25": 0.128539, "V26": -0.189115, "V27": 0.133558, "V28": -0.021053
+    }

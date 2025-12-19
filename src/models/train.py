@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import pandas as pd
-import numpy as np
 import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature
@@ -16,7 +15,6 @@ import joblib
 import matplotlib.pyplot as plt
 
 from src.utils import Config, get_logger
-from src.utils.exceptions import ModelTrainingError
 from src.models.evaluate import evaluate_model, plot_confusion_matrix
 
 logger = get_logger(__name__)
@@ -42,9 +40,9 @@ def load_split_data(
     
     # Cast integer columns to float64 to handle missing values at inference
     int_cols = X_train.select_dtypes(include=['int64', 'int32']).columns
-    X_train[int_cols] = X_train[int_cols].astype('float64')
-    X_val[int_cols] = X_val[int_cols].astype('float64')
-    X_test[int_cols] = X_test[int_cols].astype('float64')
+    X_train.loc[:, int_cols] = X_train[int_cols].astype('float64')
+    X_val.loc[:, int_cols] = X_val[int_cols].astype('float64')
+    X_test.loc[:, int_cols] = X_test[int_cols].astype('float64')
     
     logger.info(f"Train: {X_train.shape} | Val: {X_val.shape} | Test: {X_test.shape}")
     logger.info(f"Converted {len(int_cols)} integer columns to float64")
