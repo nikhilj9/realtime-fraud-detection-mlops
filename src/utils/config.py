@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
-
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class PathConfig(BaseModel):
     """File paths configuration."""
@@ -100,11 +100,20 @@ class ModelParams(BaseModel):
         }
 
 
-class MLflowConfig(BaseModel):
+class MLflowConfig(BaseSettings):
     """MLflow tracking configuration."""
     experiment_name: str = Field(default="fraud-detection")
-    tracking_uri: str = Field(default="mlruns")
+    tracking_uri: str = Field(
+        default="mlruns", 
+        validation_alias="MLFLOW_TRACKING_URI"
+    )
     log_models: bool = True
+    # This inner class tells Pydantic to read from the .env file
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8",
+        extra="ignore" # Ignores other variables in .env not defined here
+    )
 
 
 class Config(BaseModel):

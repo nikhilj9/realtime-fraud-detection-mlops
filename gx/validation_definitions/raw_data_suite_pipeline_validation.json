@@ -1,0 +1,22 @@
+{
+  "data": {
+    "asset": {
+      "id": "15a2da4f-27c2-4eef-92be-932ee3327748",
+      "name": "pipeline_asset"
+    },
+    "batch_definition": {
+      "id": "b55e1424-e7c1-4ed3-b431-a6fa3b1e2251",
+      "name": "pipeline_batch"
+    },
+    "datasource": {
+      "id": "e50d3f07-ecb6-4d0d-909f-d04e125a68a4",
+      "name": "pipeline_datasource"
+    }
+  },
+  "id": "7e8663f0-dcea-4a25-aa11-5830ee8fcae1",
+  "name": "raw_data_suite_pipeline_validation",
+  "suite": {
+    "id": "51d82078-b935-4281-aba1-5d0b59d6cea5",
+    "name": "raw_data_suite"
+  }
+}

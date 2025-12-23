@@ -1,0 +1,172 @@
+{
+  "expectations": [
+    {
+      "id": "2a1f9f83-347a-4b14-b63d-0bd8332ac534",
+      "kwargs": {
+        "column_set": [
+          "transaction_id",
+          "user_id",
+          "merchant_id",
+          "timestamp",
+          "card_network",
+          "card_issuer",
+          "card_tier",
+          "credit_limit",
+          "card_age",
+          "amount_inr",
+          "merchant_category",
+          "merchant_city",
+          "merchant_state",
+          "transaction_channel",
+          "entry_mode",
+          "is_international",
+          "is_recurring",
+          "V1",
+          "V2",
+          "V3",
+          "V4",
+          "V5",
+          "V6",
+          "V7",
+          "V8",
+          "V9",
+          "V10",
+          "V11",
+          "V12",
+          "V13",
+          "V14",
+          "V15",
+          "V16",
+          "V17",
+          "V18",
+          "V19",
+          "V20",
+          "V21",
+          "V22",
+          "V23",
+          "V24",
+          "V25",
+          "V26",
+          "V27",
+          "V28",
+          "is_fraud"
+        ],
+        "exact_match": false
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_table_columns_to_match_set"
+    },
+    {
+      "id": "4b74d6ae-6b1a-4b5e-b6ca-eb0981ffc962",
+      "kwargs": {
+        "column": "transaction_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "dd6017c7-91b1-4c09-8c6e-328f65885731",
+      "kwargs": {
+        "column": "user_id"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "95ac4d6b-3b68-4bcd-92a0-85c79f3b245c",
+      "kwargs": {
+        "column": "amount_inr"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "1af7319e-befb-44bd-bd24-6363cfaab88b",
+      "kwargs": {
+        "column": "is_fraud"
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_not_be_null"
+    },
+    {
+      "id": "61e24237-a508-4fee-8a91-c77c5060c070",
+      "kwargs": {
+        "column": "amount_inr",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "e11e4238-024c-4c70-abe6-6dcbb05d4195",
+      "kwargs": {
+        "column": "credit_limit",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "7ce7ea5e-1a4b-4ad5-9f0a-ec31ae165c3a",
+      "kwargs": {
+        "column": "card_age",
+        "min_value": 0.0
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_between"
+    },
+    {
+      "id": "a62134f3-44ac-44cc-9355-3d36f0207576",
+      "kwargs": {
+        "column": "is_fraud",
+        "value_set": [
+          0,
+          1
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "93730ce0-15e8-4231-9842-a65d9343998d",
+      "kwargs": {
+        "column": "is_international",
+        "value_set": [
+          0,
+          1
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    },
+    {
+      "id": "4353476c-9b01-4c67-ab55-2b3ef2cc9719",
+      "kwargs": {
+        "column": "is_recurring",
+        "value_set": [
+          0,
+          1
+        ]
+      },
+      "meta": {},
+      "severity": "critical",
+      "type": "expect_column_values_to_be_in_set"
+    }
+  ],
+  "id": "167eb90c-f151-4d76-878d-000c888f4d0c",
+  "meta": {
+    "great_expectations_version": "1.10.0"
+  },
+  "name": "processed_data_suite",
+  "notes": null
+}

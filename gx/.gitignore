@@ -1,0 +1,5 @@
+# Great Expectations — ignore everything that is auto-generated or local
+uncommitted/
+checkpoints/
+expectations/.ge_store_backend_id
+.ge_store_backend_id
