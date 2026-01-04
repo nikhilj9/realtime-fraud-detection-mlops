@@ -112,7 +112,7 @@ def run_pipeline(config: Config, skip_drift: bool = False) -> None:
         else:
             logger.info("Step 1.5: Skipping Drift Detection (requested via flag)")
             
-    except DataValidationError as e:
+    except DataValidationError:
         logger.error("=" * 60)
         logger.error("PIPELINE ABORTED: Data quality/drift check failed")
         logger.error("=" * 60)

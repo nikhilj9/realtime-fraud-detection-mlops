@@ -22,6 +22,7 @@ dependencies = [
     "great-expectations[cli]>=1.10.0",
     "evidently==0.7.18",
     "pydantic-settings>=2.12.0",
+    "prometheus-fastapi-instrumentator>=7.1.0",
 ]
 
 [dependency-groups]

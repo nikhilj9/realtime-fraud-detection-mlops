@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from src.api.schemas.transaction import TransactionRequest, PredictionResponse
 from src.utils.logger import get_logger
+from src.monitoring.metrics import PREDICTION_TOTAL, PREDICTION_LATENCY
 
 logger = get_logger(__name__)
 
@@ -62,39 +63,45 @@ def get_risk_level(probability: float) -> str:
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_fraud(transaction: TransactionRequest, request: Request):
     """Predict if a transaction is fraudulent."""
-    try:
-        model = request.app.state.model
-        encoder = request.app.state.encoder
-        feature_columns = request.app.state.feature_columns
-        
-        df = engineer_features(transaction, encoder)
-        
-        missing_cols = set(feature_columns) - set(df.columns)
-        if missing_cols:
-            logger.warning(f"Missing columns (setting to 0): {missing_cols}")
-            for col in missing_cols:
-                df[col] = 0
-        
-        X = df[feature_columns]
-        
-        logger.debug(f"Feature columns: {list(X.columns)}")
-        logger.debug(f"Feature dtypes: {X.dtypes.to_dict()}")
-        
-        fraud_probability = float(model.predict_proba(X)[0][1])
-        is_fraud = fraud_probability >= 0.5
-        risk_level = get_risk_level(fraud_probability)
-        
-        logger.info(f"Prediction: fraud_prob={fraud_probability:.4f}, is_fraud={is_fraud}")
-        
-        return PredictionResponse(
-            is_fraud=is_fraud,
-            fraud_probability=round(fraud_probability, 4),
-            risk_level=risk_level,
-        )
-        
-    except Exception as e:
-        logger.error(f"Prediction failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    
+    # Start Latency Timer
+    with PREDICTION_LATENCY.time():
+        try:
+            model = request.app.state.model
+            encoder = request.app.state.encoder
+            feature_columns = request.app.state.feature_columns
+            
+            df = engineer_features(transaction, encoder)
+            
+            missing_cols = set(feature_columns) - set(df.columns)
+            if missing_cols:
+                logger.warning(f"Missing columns (setting to 0): {missing_cols}")
+                for col in missing_cols:
+                    df[col] = 0
+            
+            X = df[feature_columns]
+            
+            logger.debug(f"Feature columns: {list(X.columns)}")
+            
+            fraud_probability = float(model.predict_proba(X)[0][1])
+            is_fraud = fraud_probability >= 0.5
+            risk_level = get_risk_level(fraud_probability)
+            
+            logger.info(f"Prediction: fraud_prob={fraud_probability:.4f}, is_fraud={is_fraud}")
+            
+            # Record Business Metric
+            status_label = "fraud" if is_fraud else "legit"
+            PREDICTION_TOTAL.labels(status=status_label, risk_level=risk_level).inc()
+            
+            return PredictionResponse(
+                is_fraud=is_fraud,
+                fraud_probability=round(fraud_probability, 4),
+                risk_level=risk_level,
+            )
+            
+        except Exception as e:
+            logger.error(f"Prediction failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/debug", include_in_schema=False)
