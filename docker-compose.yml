@@ -21,11 +21,35 @@ services:
   grafana:
     image: grafana/grafana:11.5.0
     volumes:
-      # Mount the provisioning CONFIG
       - ./src/config/grafana/provisioning:/etc/grafana/provisioning
-      # Mount the DASHBOARD JSONs
       - ./src/config/grafana/dashboards:/var/lib/grafana/dashboards
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+
+  prefect-server:
+    image: prefecthq/prefect:3.6.9-python3.12
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      - PREFECT_HOME=/root/.prefect
+    volumes:
+      - prefect-data:/root/.prefect
+
+  prefect-worker:
+    build: .
+    depends_on:
+      - prefect-server
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs    # Persist logs to your host machine
+    command: /app/.venv/bin/prefect worker start --pool "local-process-pool"
+
+volumes:
+  prefect-data:

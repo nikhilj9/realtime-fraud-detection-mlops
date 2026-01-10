@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-api-service
+  namespace: fraud-detection
+spec:
+  type: ClusterIP # Only reachable INSIDE the cluster (Prefect talks to this)
+  selector:
+    app: fraud-api # Finds pods with this label
+  ports:
+    - protocol: TCP
+      port: 80       # The Service port
+      targetPort: 8000 # The Container port

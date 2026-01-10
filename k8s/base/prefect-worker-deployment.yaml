@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prefect-worker
+  namespace: fraud-detection
+  labels:
+    app: prefect-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prefect-worker
+  template:
+    metadata:
+      labels:
+        app: prefect-worker
+    spec:
+      containers:
+      - name: worker
+        image: fraud-detection-api:latest
+        imagePullPolicy: IfNotPresent
+        
+        # Override the API command to run the Worker instead
+        command: ["prefect", "worker", "start", "--pool", "default-agent-pool", "--type", "process"]
+        
+        env:
+        # Connect to the K8s internal Service DNS
+        - name: PREFECT_API_URL
+          value: "http://prefect-server-service:4200/api"
+        
+        # Tell the code where to look for data (Mount point)
+        - name: DATA_PATH
+          value: "/app/data"
+        - name: MODEL_PATH
+          value: "/app/models"
+          
+        volumeMounts:
+        - name: fraud-data
+          mountPath: /app/data
+          subPath: data  # Stores in PVC/data
+        - name: fraud-data
+          mountPath: /app/models
+          subPath: models # Stores in PVC/models
+            
+      volumes:
+      - name: fraud-data
+        persistentVolumeClaim:
+          claimName: fraud-data-pvc

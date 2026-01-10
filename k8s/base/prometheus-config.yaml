@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: fraud-detection
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      # Job 1: Scrape Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Job 2: Auto-discover fraud-api pods
+      - job_name: 'fraud-api'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - fraud-detection
+        
+        # Only scrape pods with label "app=fraud-api"
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: fraud-api
+          
+          # Use the pod's IP and port 8000
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            regex: (.+)
+            replacement: ${1}:8000
+          
+          # Add pod name as a label for debugging
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod

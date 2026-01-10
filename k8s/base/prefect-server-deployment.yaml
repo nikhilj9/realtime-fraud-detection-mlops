@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prefect-server
+  namespace: fraud-detection
+  labels:
+    app: prefect-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prefect-server
+  template:
+    metadata:
+      labels:
+        app: prefect-server
+    spec:
+      containers:
+      - name: server
+        image: prefecthq/prefect:3.6.9-python3.12
+        command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+        ports:
+        - containerPort: 4200
+        
+        # 1. Environment Variables
+        env:
+        - name: PREFECT_UI_URL
+          value: "http://localhost:4200/api" # Internal ref
+          
+        # 2. Mount the "USB Drive" (PVC)
+        volumeMounts:
+        - name: prefect-storage
+          mountPath: /root/.prefect
+          
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+            
+      volumes:
+      - name: prefect-storage
+        persistentVolumeClaim:
+          claimName: prefect-data-pvc

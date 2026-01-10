@@ -1,7 +1,7 @@
 {
   "expectations": [
     {
-      "id": "f5ab2955-e754-4e0a-8845-b165bc5b38ab",
+      "id": "75e5444b-d86a-4014-86b6-9a4130b5f067",
       "kwargs": {
         "column_set": [
           "transaction_id",
@@ -58,7 +58,7 @@
       "type": "expect_table_columns_to_match_set"
     },
     {
-      "id": "16dccded-3d5f-4c3e-8d4e-3b422b8e2d06",
+      "id": "2c8cdc43-7d1a-48be-9c2e-93c083fa9927",
       "kwargs": {
         "column": "transaction_id"
       },
@@ -67,7 +67,7 @@
       "type": "expect_column_values_to_not_be_null"
     },
     {
-      "id": "00f7de57-0a56-485f-855e-2fe065ed4393",
+      "id": "2f3ade70-bd76-47cc-bba6-e761026f2bc5",
       "kwargs": {
         "column": "user_id"
       },
@@ -76,7 +76,7 @@
       "type": "expect_column_values_to_not_be_null"
     },
     {
-      "id": "ca3c5be0-f452-43ff-9781-ba6df294c20d",
+      "id": "527fe49f-4037-4a3b-afe9-d3231af51289",
       "kwargs": {
         "column": "amount_inr"
       },
@@ -85,7 +85,7 @@
       "type": "expect_column_values_to_not_be_null"
     },
     {
-      "id": "2ec47a13-634d-40ea-8452-9156bd8adc7a",
+      "id": "9209fbd7-faed-4978-96ae-1824f9c8e666",
       "kwargs": {
         "column": "is_fraud"
       },
@@ -94,7 +94,7 @@
       "type": "expect_column_values_to_not_be_null"
     },
     {
-      "id": "2f8c2565-f2ff-403b-be41-311799b9757f",
+      "id": "413e6551-fc36-4e11-a8b8-15a72688354a",
       "kwargs": {
         "column": "amount_inr",
         "min_value": 0.0
@@ -104,7 +104,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "11fd52f7-abbd-4aea-b8c4-4a997f163595",
+      "id": "d16ad6c7-7773-4ed6-b967-303b208462bb",
       "kwargs": {
         "column": "credit_limit",
         "min_value": 0.0
@@ -114,7 +114,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "5a711a06-057d-4f56-8e4a-1d9ad5db03d1",
+      "id": "b888ab7e-ced9-439f-bb36-103e6c7ddcc6",
       "kwargs": {
         "column": "card_age",
         "min_value": 0.0
@@ -124,7 +124,7 @@
       "type": "expect_column_values_to_be_between"
     },
     {
-      "id": "2af44b82-0af8-4f2c-ba40-4869b68d19b8",
+      "id": "06dc56c1-a95d-473b-b627-6145f7cd9812",
       "kwargs": {
         "column": "is_fraud",
         "value_set": [
@@ -137,7 +137,7 @@
       "type": "expect_column_values_to_be_in_set"
     },
     {
-      "id": "800fd5c8-a91f-4eac-ae41-d377de66a159",
+      "id": "b6bb0881-a30b-4b46-b541-26a3b44f4bc7",
       "kwargs": {
         "column": "is_international",
         "value_set": [
@@ -150,7 +150,7 @@
       "type": "expect_column_values_to_be_in_set"
     },
     {
-      "id": "6efe9921-9816-4a4b-8452-2f249db37e0c",
+      "id": "f64f7b18-35df-4d4b-a969-c31d51567577",
       "kwargs": {
         "column": "is_recurring",
         "value_set": [
@@ -163,7 +163,7 @@
       "type": "expect_column_values_to_be_in_set"
     }
   ],
-  "id": "97101368-78bb-4bce-aeba-8dbeeba16a10",
+  "id": "65c6f967-5fb3-48c3-af55-0ed514e20b9d",
   "meta": {
     "great_expectations_version": "1.10.0"
   },
