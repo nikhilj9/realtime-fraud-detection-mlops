@@ -1,0 +1,20 @@
+# k8s/base/postgres-service.yaml
+# Purpose: Give PostgreSQL a stable network address inside the cluster
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: fraud-detection
+  labels:
+    app: postgres
+    component: mlflow-backend
+spec:
+  type: ClusterIP              # Internal only (no external access needed)
+  ports:
+    - port: 5432               # Standard PostgreSQL port
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+  selector:
+    app: postgres              # Routes traffic to pods with this label

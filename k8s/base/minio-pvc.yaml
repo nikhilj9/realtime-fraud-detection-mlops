@@ -1,0 +1,18 @@
+# k8s/base/minio-pvc.yaml
+# Purpose: Persistent storage for model artifacts and other large files
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+  namespace: fraud-detection
+  labels:
+    app: minio
+    component: mlflow-artifacts
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi             # 5GB for model files (adjust if needed)
+  storageClassName: standard

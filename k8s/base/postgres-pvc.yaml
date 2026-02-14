@@ -1,0 +1,19 @@
+# k8s/base/postgres-pvc.yaml
+# Purpose: Persistent storage for PostgreSQL database files
+# This survives pod restarts and redeployments
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: fraud-detection
+  labels:
+    app: postgres
+    component: mlflow-backend
+spec:
+  accessModes:
+    - ReadWriteOnce          # Only one pod can write at a time (standard for DBs)
+  resources:
+    requests:
+      storage: 1Gi           # 1GB is plenty for experiment metadata
+  storageClassName: standard # Minikube's default storage class

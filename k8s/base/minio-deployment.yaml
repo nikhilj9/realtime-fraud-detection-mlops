@@ -1,0 +1,79 @@
+# k8s/base/minio-deployment.yaml
+# Purpose: Run the MinIO S3-compatible object storage server
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: fraud-detection
+  labels:
+    app: minio
+    component: mlflow-artifacts
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  strategy:
+    type: Recreate             # Same as PostgreSQL - don't run two instances
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          
+          # MinIO command: run server with console enabled
+          args:
+            - server
+            - /data                    # Where to store files
+            - --console-address
+            - ":9001"                  # Web UI port
+          
+          ports:
+            - containerPort: 9000      # S3 API port
+              name: api
+            - containerPort: 9001      # Web Console port
+              name: console
+          
+          # Load credentials from Secret
+          envFrom:
+            - secretRef:
+                name: minio-secret
+          
+          # Mount storage - MinIO doesn't have the same issue as PostgreSQL
+          # but we use subPath for consistency and cleanliness
+          volumeMounts:
+            - name: minio-storage
+              mountPath: /data
+              subPath: minio-data
+          
+          # Health check: Is MinIO responding?
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      
+      volumes:
+        - name: minio-storage
+          persistentVolumeClaim:
+            claimName: minio-pvc

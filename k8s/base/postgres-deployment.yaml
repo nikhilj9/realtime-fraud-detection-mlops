@@ -1,0 +1,73 @@
+# k8s/base/postgres-deployment.yaml
+# Purpose: Run the PostgreSQL database server
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: fraud-detection
+  labels:
+    app: postgres
+    component: mlflow-backend
+spec:
+  replicas: 1                    # Databases run as single instance (not horizontally scaled)
+  selector:
+    matchLabels:
+      app: postgres
+  strategy:
+    type: Recreate               # IMPORTANT: Don't run 2 instances during updates (data corruption!)
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine  # Alpine = smaller image, PostgreSQL 15 = stable
+          
+          ports:
+            - containerPort: 5432
+              name: postgres
+          
+          # Load credentials from our Secret
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          
+          # THE FIX: Tell PostgreSQL to use our subPath directory
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata  # Must match mountPath + subPath
+          
+          # Mount the PVC with subPath to avoid "directory not empty" error
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata        # ← THE KEY FIX: Creates empty subdirectory
+          
+          # Health check: Can PostgreSQL accept connections?
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - mlflow
+                - -d
+                - mlflow_db
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          
+          # Resource limits for Minikube (adjust if needed)
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+      
+      # Define the volume (connects to PVC)
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
