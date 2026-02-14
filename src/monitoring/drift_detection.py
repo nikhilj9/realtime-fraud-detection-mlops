@@ -9,7 +9,9 @@ Key API patterns for 0.7.18:
 - Column names are embedded in metric_name string: "ValueDrift(column=X,...)"
 """
 
+import gc
 import json
+import os
 import re
 import warnings
 from dataclasses import dataclass
@@ -95,11 +97,11 @@ def create_datasets(
     logger.debug(f"Creating datasets with {len(monitored_cols)} monitored columns")
     
     reference_dataset = Dataset.from_pandas(
-        reference_df[monitored_cols].copy(),
+        reference_df[monitored_cols],
         data_definition=data_definition,
     )
     current_dataset = Dataset.from_pandas(
-        current_df[monitored_cols].copy(),
+        current_df[monitored_cols],
         data_definition=data_definition,
     )
     
@@ -209,11 +211,13 @@ def detect_drift(
     # 2. Configure and Run Report
     report = Report([DataDriftPreset()])
     
-    # In 0.7.18, run() returns a Snapshot object
-    # The Snapshot has .json() and .save_html() methods
     logger.info("Running drift analysis...")
     snapshot = report.run(reference_data=reference_ds, current_data=current_ds)
     logger.info("Drift analysis complete")
+
+    # Free Evidently datasets immediately - they're no longer needed
+    del current_ds, reference_ds, report
+    gc.collect()
 
     # 3. Parse Results from Snapshot JSON
     drift_info = parse_drift_from_json(snapshot.json())
@@ -232,15 +236,29 @@ def detect_drift(
     else:
         severity = DriftSeverity.NONE
 
-    # 5. Save HTML Report
+    # 5. Save Report (JSON always, HTML only if not in K8s)
     report_path = None
     if save_report:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        report_path = output_path / f"drift_report_{timestamp}.html"
-        snapshot.save_html(str(report_path))
-        logger.info(f"HTML report saved: {report_path}")
+        
+        # Always save JSON (lightweight, ~100KB)
+        json_report_path = output_path / f"drift_report_{timestamp}.json"
+        with open(json_report_path, "w") as f:
+            f.write(snapshot.json())
+        logger.info(f"JSON report saved: {json_report_path}")
+        report_path = json_report_path
+        
+        # HTML is memory-intensive (~2-3GB spike for 41 columns)
+        # Only generate if DRIFT_SAVE_HTML=true (skip in K8s by default)
+        if os.getenv("DRIFT_SAVE_HTML", "false").lower() == "true":
+            html_report_path = output_path / f"drift_report_{timestamp}.html"
+            snapshot.save_html(str(html_report_path))
+            report_path = html_report_path
+            logger.info(f"HTML report saved: {html_report_path}")
+        else:
+            logger.info("HTML report skipped (set DRIFT_SAVE_HTML=true to enable)")
 
     # 6. Log Summary
     logger.info("Drift Summary:")

@@ -38,7 +38,7 @@ def split_data_for_drift(
     if "timestamp" in df.columns:
         df = df.sort_values("timestamp")
         split_idx = int(len(df) * reference_ratio)
-        reference_df = df.iloc[:split_idx].copy()
+        reference_df = df.iloc[:split_idx]
         current_df = df.iloc[split_idx:].copy()
         logger.info(f"Split data by time: {len(reference_df)} ref, {len(current_df)} curr")
     else:
