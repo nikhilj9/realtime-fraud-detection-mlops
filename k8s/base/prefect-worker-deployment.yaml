@@ -15,33 +15,60 @@ spec:
       labels:
         app: prefect-worker
     spec:
+      serviceAccountName: prefect-worker-sa
+      
       containers:
       - name: worker
-        image: fraud-detection-api:latest
-        imagePullPolicy: IfNotPresent
-        
-        # Override the API command to run the Worker instead
-        command: ["prefect", "worker", "start", "--pool", "default-agent-pool", "--type", "process"]
+        image: fraud-api:v22
+        imagePullPolicy: Never
+        command: ["/bin/sh", "-c"]
+        args:
+        - "prefect worker start --pool diagnostic-k8s-pool --type kubernetes"
         
         env:
-        # Connect to the K8s internal Service DNS
         - name: PREFECT_API_URL
-          value: "http://prefect-server-service:4200/api"
-        
-        # Tell the code where to look for data (Mount point)
+          value: http://prefect-server-service:4200/api
+        - name: PREFECT_API_TIMEOUT
+          value: "60"
+        - name: PREFECT_HEARTBEAT_INTERVAL
+          value: "15"
+        - name: MLFLOW_TRACKING_URI
+          value: http://mlflow:5000
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: http://minio:9000
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_USER
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_PASSWORD
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
         - name: DATA_PATH
-          value: "/app/data"
+          value: /app/data
         - name: MODEL_PATH
-          value: "/app/models"
-          
+          value: /app/models
+        
+        resources:
+          requests:
+            cpu: "1000m"
+            memory: 1Gi
+          limits:
+            cpu: "2000m"
+            memory: 2Gi
+        
         volumeMounts:
         - name: fraud-data
-          mountPath: /app/data
-          subPath: data  # Stores in PVC/data
-        - name: fraud-data
           mountPath: /app/models
-          subPath: models # Stores in PVC/models
-            
+          subPath: models
+        - name: fraud-data
+          mountPath: /app/data/processed
+          subPath: data/processed
+      
       volumes:
       - name: fraud-data
         persistentVolumeClaim:

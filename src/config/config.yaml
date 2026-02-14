@@ -1,8 +1,8 @@
 # Fraud Detection Pipeline Configuration
 
 paths:
-  raw_data: "data/raw/creditcard.csv"
-  processed_data: "data/processed"
+  raw_data: "s3://raw-data/creditcard.csv"
+  processed_data: "/app/data/processed"
   models: "models"
   logs: "logs"
 

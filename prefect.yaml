@@ -1,28 +1,57 @@
 name: realtime-fraud-detection-mlops
 prefect-version: 3.6.9
 
-build: null
-push: null
-
-pull:
-  - prefect.deployments.steps.set_working_directory:
-      directory: /app
+pull: []
 
 deployments:
-  - name: "daily-training-local"
+  - name: "k8s-training-mlflow"
     version: "1.0.0"
-    tags: ["local", "training"]
-    description: "Daily fraud detection model retraining."
+    tags: ["kubernetes", "training", "mlflow"]
+    description: "Fraud detection model training with MLflow integration."
     entrypoint: "src/pipelines/training_flow.py:training_flow"
-    parameters: {}
+    
+    pull:
+      - prefect.deployments.steps.set_working_directory:
+          directory: /app
+
+    parameters:
+      config_path: "src/config/config.yaml"
+      skip_drift: false
+    
     work_pool:
-      name: "local-process-pool"
+      name: "diagnostic-k8s-pool"
       work_queue_name: default
       job_variables:
+        image: "fraud-api:v22"
+        namespace: "fraud-detection"
+        
+        customizations:
+          # Add data PVC mount (CRITICAL - training needs data!)
+          - op: add
+            path: /spec/template/spec/volumes
+            value:
+              - name: fraud-data
+                persistentVolumeClaim:
+                  claimName: fraud-data-pvc
+          - op: add
+            path: /spec/template/spec/containers/0/volumeMounts
+            value:
+              - name: fraud-data
+                mountPath: /app/data
+          # Resource limits (keep existing)
+          - op: add
+            path: /spec/template/spec/containers/0/resources
+            value:
+              limits:
+                memory: "7Gi"
+                cpu: "3000m"
+              requests:
+                memory: "2Gi"
+                cpu: "1000m"
+        
         env:
           PREFECT_LOGGING_LEVEL: "INFO"
-
-    # schedules:
-    #   - cron: "0 2 * * *"
-    #     timezone: "UTC"
-    #     active: true
+          MLFLOW_TRACKING_URI: "http://mlflow:5000"
+          MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
+          AWS_ACCESS_KEY_ID: "mlflow"
+          AWS_SECRET_ACCESS_KEY: "mlflow123"
