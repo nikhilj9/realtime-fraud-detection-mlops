@@ -13,10 +13,13 @@ __pycache__
 .pytest_cache/
 logs/
 
-# Data
-data/raw/
+# Keep excluding most data
+data/
 notebooks/
 tests/
+
+# But specifically INCLUDE these required files
+!data/processed/*.joblib
 
 # README
 README.md
