@@ -1,31 +1,34 @@
-"""Model training - Production version (single model)."""
+"""Model training - Production version (single model).
+
+This module is designed to be called by an orchestrator (training_flow.py).
+"""
 
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import pandas as pd
-import mlflow
-import mlflow.sklearn
-from mlflow.models import infer_signature
 from sklearn.preprocessing import RobustScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from imblearn.pipeline import Pipeline as ImbPipeline
 import xgboost as xgb
 import joblib
-import matplotlib.pyplot as plt
 
 from src.utils import Config, get_logger
-from src.models.evaluate import evaluate_model, plot_confusion_matrix
+from src.models.evaluate import evaluate_model
 
 logger = get_logger(__name__)
 
+
+# =============================================================================
+# DATA LOADING
+# =============================================================================
 
 def load_split_data(
     train_path: Path,
     val_path: Path,
     test_path: Path
 ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
-    """Load train, validation, and test data."""
+    """Load train, validation, and test data from parquet files."""
     
     train_df = pd.read_parquet(train_path)
     val_df = pd.read_parquet(val_path)
@@ -39,7 +42,7 @@ def load_split_data(
     X_test, y_test = test_df[features], test_df[target]
     
     # Cast integer columns to float64 to handle missing values at inference
-    int_cols = X_train.select_dtypes(include=['int64', 'int32']).columns
+    int_cols = X_train.select_dtypes(include=['int64', 'int32', 'int16', 'int8']).columns
     X_train.loc[:, int_cols] = X_train[int_cols].astype('float64')
     X_val.loc[:, int_cols] = X_val[int_cols].astype('float64')
     X_test.loc[:, int_cols] = X_test[int_cols].astype('float64')
@@ -50,8 +53,12 @@ def load_split_data(
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 
+# =============================================================================
+# PREPROCESSING
+# =============================================================================
+
 def create_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
-    """Create preprocessing pipeline."""
+    """Create preprocessing pipeline with categorical encoding and numeric scaling."""
     
     cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
     num_cols = X.select_dtypes(include=["number"]).columns.tolist()
@@ -65,6 +72,10 @@ def create_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
     )
 
 
+# =============================================================================
+# TRAINING
+# =============================================================================
+
 def train_model(
     X_train: pd.DataFrame,
     y_train: pd.Series,
@@ -72,15 +83,18 @@ def train_model(
     y_val: pd.Series,
     config: Config
 ) -> Tuple[Any, Dict[str, float]]:
-    """Train the production model (XGBoost with class weights)."""
+    """
+    Train the production model (XGBoost with class weights).
     
+    Returns:
+        Tuple of (trained_pipeline, validation_metrics)
+    """
     logger.info("Training XGBoost with class weights")
     
-    # Calculate class weight
+    # Handle class imbalance via scale_pos_weight
     scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
     logger.info(f"scale_pos_weight: {scale_pos_weight:.2f}")
     
-    # Create pipeline
     preprocessor = create_preprocessor(X_train)
     
     pipeline = ImbPipeline([
@@ -100,10 +114,8 @@ def train_model(
         ))
     ])
     
-    # Train
     pipeline.fit(X_train, y_train)
     
-    # Evaluate on validation
     val_metrics, _, _ = evaluate_model(pipeline, X_val, y_val, "Validation")
     
     return pipeline, val_metrics
@@ -116,8 +128,11 @@ def retrain_on_train_val(
     y_val: pd.Series,
     config: Config
 ) -> Any:
-    """Retrain on train + validation for final model."""
+    """
+    Retrain on combined train + validation data for final model.
     
+    This is a common practice to maximize training data before final deployment.
+    """
     logger.info("Retraining on train + validation")
     
     X_combined = pd.concat([X_train, X_val], ignore_index=True)
@@ -149,49 +164,31 @@ def retrain_on_train_val(
     return pipeline
 
 
+# =============================================================================
+# EVALUATION
+# =============================================================================
+
 def final_evaluation(
     model: Any,
     X_test: pd.DataFrame,
     y_test: pd.Series,
     config: Config
 ) -> Dict[str, float]:
-    """Final evaluation on test set with MLflow logging."""
+    """
+    Final evaluation on test set.
     
-    mlflow.set_tracking_uri(config.mlflow.tracking_uri)
-    mlflow.set_experiment(config.mlflow.experiment_name)
-    
-    with mlflow.start_run(run_name="Production_XGBoost") as run:
-        
-        # Log parameters
-        mlflow.log_params({
-            "model_type": "XGBoost_Weighted",
-            "n_estimators": config.model.n_estimators,
-            "max_depth": config.model.max_depth,
-            "learning_rate": config.model.learning_rate
-        })
-        
-        # Evaluate
-        test_metrics, y_pred, y_prob = evaluate_model(model, X_test, y_test, "TEST")
-        
-        # Log metrics
-        mlflow.log_metrics(test_metrics)
-        
-        # Log confusion matrix
-        fig = plot_confusion_matrix(y_test.values, y_pred, title="Test Confusion Matrix")
-        mlflow.log_figure(fig, "confusion_matrix.png")
-        plt.close(fig)
-        
-        # Log model
-        signature = infer_signature(X_test.iloc[:5], model.predict(X_test.iloc[:5]))
-        mlflow.sklearn.log_model(model, name="model", signature=signature)
-        
-        logger.info(f"Run ID: {run.info.run_id}")
-        
-        return test_metrics
+    Note: This function only computes metrics. MLflow logging is handled by the orchestrator.
+    """
+    test_metrics, _, _ = evaluate_model(model, X_test, y_test, "TEST")
+    return test_metrics
 
+
+# =============================================================================
+# MODEL PERSISTENCE
+# =============================================================================
 
 def save_model(model: Any, output_path: Path) -> None:
-    """Save model to disk."""
+    """Save model to disk using joblib."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, output_path)
     logger.info(f"Saved: {output_path}")

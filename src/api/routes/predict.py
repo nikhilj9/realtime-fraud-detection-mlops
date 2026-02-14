@@ -63,6 +63,13 @@ def get_risk_level(probability: float) -> str:
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_fraud(transaction: TransactionRequest, request: Request):
     """Predict if a transaction is fraudulent."""
+
+    # Guard clause: Check if model is loaded
+    if request.app.state.model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model not loaded. Please run the training pipeline first."
+        )
     
     # Start Latency Timer
     with PREDICTION_LATENCY.time():
