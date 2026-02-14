@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
+# --- IMPORTS ---
+from src.data.generation import generate, save
 from src.features.engineering import run_feature_engineering
 from src.monitoring.drift_config import DriftSeverity
 from src.monitoring.drift_detection import detect_drift
@@ -97,13 +99,22 @@ def run_pipeline(config: Config, skip_drift: bool = False) -> None:
     logger.info("PRODUCTION TRAINING PIPELINE")
     logger.info("=" * 60)
     
+    # --- Step 0 - Data Enrichment ---
+    logger.info("Step 0: Data Enrichment (Generation)")
+    # This reads raw CSV (via config.paths.raw_data) and adds IDs/Timestamps
+    enriched_df = generate(config)
+    
+    # Define where the enriched data goes
+    enriched_path = config.paths.processed_data / config.generation.output_filename
+    save(enriched_df, enriched_path)
+    # ---------------------------------------
+
     # Step 1: Validate Raw Data (GATE)
     logger.info("Step 1: Data Validation")
-    input_path = config.paths.processed_data / config.generation.output_filename
     
     try:
-        # Load and validate schema
-        validated_df = validate_raw_data(input_path)
+        # Load and validate schema (now pointing to the newly generated file)
+        validated_df = validate_raw_data(enriched_path)
         
         # Step 1.5: Check for Drift (GATE)
         if not skip_drift:
@@ -121,7 +132,7 @@ def run_pipeline(config: Config, skip_drift: bool = False) -> None:
     # Step 2: Feature Engineering
     logger.info("Step 2: Feature Engineering")
     paths = run_feature_engineering(
-        input_path=input_path,
+        input_path=enriched_path, # Use the enriched file
         output_dir=config.paths.processed_data,
         train_ratio=config.split.train_ratio,
         val_ratio=config.split.val_ratio,

@@ -9,15 +9,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class PathConfig(BaseModel):
     """File paths configuration."""
-    raw_data: Path
+    raw_data: str 
     processed_data: Path = Path("data/processed")
     models: Path = Path("models")
     logs: Path = Path("logs")
     
     @field_validator("raw_data")
     @classmethod
-    def check_raw_exists(cls, v: Path) -> Path:
-        if not v.exists():
+    def check_raw_exists(cls, v: str) -> str:
+        # 1. Check if it's an S3 URI (double or single slash just in case)
+        if v.startswith("s3://") or v.startswith("s3:/"):
+            return v  
+            
+        # 2. Otherwise, check if local file exists
+        if not Path(v).exists():
             raise ValueError(f"Raw data not found: {v}")
         return v
     
