@@ -223,3 +223,9 @@ tree.py
 
 # Drift monitoring reports (generated HTML)
 reports/
+
+# IDE
+.vscode/
+
+# Data files
+*.parquet
