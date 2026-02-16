@@ -1,16 +1,16 @@
 # tests/unit/test_model_prediction.py
 """Tests for model prediction utilities."""
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 from src.models.predict import (
+    batch_predict,
     load_model,
     predict,
     predict_proba,
     predict_with_threshold,
-    batch_predict,
 )
 from src.utils.exceptions import ModelPredictionError
 

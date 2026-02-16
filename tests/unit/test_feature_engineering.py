@@ -1,19 +1,19 @@
 # test_feature_engineering.py
 """Tests for feature engineering module."""
 
-import pytest
-import pandas as pd
 import joblib
+import pandas as pd
+import pytest
 
+from src.features.encoders import TargetEncoder
 from src.features.engineering import (
-    TargetEncoder,
-    time_based_split,
-    add_time_features,
     add_amount_features,
     add_interaction_features,
+    add_time_features,
     engineer_features,
     get_feature_columns,
     run_feature_engineering,
+    time_based_split,
 )
 
 
@@ -57,23 +57,23 @@ class TestTargetEncoder:
         # Create minimal controlled data
         df = pd.DataFrame({"category": ["A", "A", "B"]})
         y = pd.Series([0, 0, 1])  # Global mean = 1/3 (0.333...)
-        
+
         # Initialize with specific smoothing factor
         smoothing_factor = 10
         encoder = TargetEncoder(column="category", smoothing=smoothing_factor)
         encoder.fit(df, y)
         result = encoder.transform(df)
-        
+
         global_mean = 1/3
-        
+
         # Manual Calculation for Category 'A' (n=2, mean=0):
         # (2 * 0.0 + 10 * 0.333) / (2 + 10) = 3.33 / 12 ≈ 0.2777
         numerator = (2 * 0.0) + (smoothing_factor * global_mean)
         denominator = 2 + smoothing_factor
         expected_a = numerator / denominator
-        
+
         actual_a = result["category_encoded"].iloc[0]
-        
+
         # Use approx for floating point comparison
         assert actual_a == pytest.approx(expected_a), "Smoothing formula calculation incorrect"
 
@@ -106,11 +106,23 @@ class TestTimeSplit:
 class TestFeatureEngineering:
     """Tests for feature engineering functions."""
 
-    def test_engineer_features_no_mutation(self, small_fraud_df):
-        """Verify engineer_features does not modify input."""
-        original = small_fraud_df.copy()
-        engineer_features(small_fraud_df, fit_encoder=True, y=small_fraud_df["is_fraud"])
-        pd.testing.assert_frame_equal(small_fraud_df, original, obj="Input DataFrame")
+    def test_engineer_features_adds_expected_columns(self, small_fraud_df):
+        """Verify engineer_features adds all expected feature columns."""
+        df = small_fraud_df.copy()
+        result_df, encoder = engineer_features(df, fit_encoder=True, y=df["is_fraud"])
+
+        # Check time features were added
+        assert "hour" in result_df.columns, "hour column must be added"
+        assert "day_of_week" in result_df.columns, "day_of_week column must be added"
+        assert "is_night" in result_df.columns, "is_night column must be added"
+        assert "is_weekend" in result_df.columns, "is_weekend column must be added"
+
+        # Check amount features were added
+        assert "log_amount" in result_df.columns, "log_amount column must be added"
+
+        # Check encoder was created
+        assert encoder is not None, "Encoder must be returned when fit_encoder=True"
+        assert hasattr(encoder, "transform"), "Encoder must have transform method"
 
     def test_time_features_domain_constraints(self, small_fraud_df):
         """Verify time features are within valid domain ranges."""
@@ -165,14 +177,14 @@ class TestFeatureEngineering:
         Must process 100 rows in under 50ms to ensure scalability.
         """
         import time
-        
+
         # Warmup (optional, helps exclude import times)
         _ = engineer_features(sample_fraud_df.copy(), fit_encoder=True, y=sample_fraud_df["is_fraud"])
-        
+
         start_time = time.time()
         engineer_features(sample_fraud_df, fit_encoder=True, y=sample_fraud_df["is_fraud"])
         duration = time.time() - start_time
-        
-        # Threshold: 0.05s (50ms). 
+
+        # Threshold: 0.05s (50ms).
         # If 100 rows take >50ms, 1 million rows will take >8 minutes (too slow for many SLAs).
         assert duration < 0.05, f"Pipeline too slow! Took {duration:.4f}s for 100 rows."

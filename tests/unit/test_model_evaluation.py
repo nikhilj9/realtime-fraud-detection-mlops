@@ -1,9 +1,10 @@
 # tests/unit/test_model_evaluation.py
 """Tests for model evaluation utilities."""
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -11,8 +12,8 @@ from src.models.evaluate import (
     calculate_metrics,
     evaluate_model,
     plot_confusion_matrix,
-    plot_precision_recall_curve,
     plot_feature_importance,
+    plot_precision_recall_curve,
 )
 
 

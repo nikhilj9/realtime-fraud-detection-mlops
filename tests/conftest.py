@@ -1,18 +1,17 @@
-# tests/conftest.py (UPDATED - add to existing file)
+# tests/conftest.py
 """Shared fixtures for all test modules."""
 
-import pytest
-import pandas as pd
+from unittest.mock import MagicMock, patch
+
+import joblib
 import numpy as np
-from unittest.mock import patch, MagicMock
-from sklearn.linear_model import LogisticRegression
+import pandas as pd
+import pytest
+from fastapi.testclient import TestClient
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-import joblib
-
-from fastapi.testclient import TestClient
-from src.api.app import app
 
 # =============================================================================
 # COMMON FIXTURES
@@ -34,7 +33,7 @@ def sample_fraud_df():
     np.random.seed(42)
     n = 100
     timestamps = pd.date_range("2024-01-01", periods=n, freq="H")
-    
+
     return pd.DataFrame({
         "transaction_id": [f"TXN_{i:05d}" for i in range(n)],
         "user_id": [f"USER_{i % 20:03d}" for i in range(n)],
@@ -253,26 +252,26 @@ def model_without_feature_importance(numeric_feature_df):
 def pipeline_config(tmp_path):
     """Complete mock config for pipeline testing."""
     config = MagicMock()
-    
+
     config.paths.processed_data = tmp_path / "processed"
     config.paths.models = tmp_path / "models"
     config.paths.processed_data.mkdir(parents=True, exist_ok=True)
     config.paths.models.mkdir(parents=True, exist_ok=True)
-    
+
     config.generation.output_filename = "transactions.parquet"
     config.split.train_ratio = 0.6
     config.split.val_ratio = 0.2
-    
+
     config.model.n_estimators = 10
     config.model.max_depth = 3
     config.model.learning_rate = 0.1
     config.model.subsample = 0.8
     config.model.colsample_bytree = 0.8
     config.model.random_state = 42
-    
+
     config.mlflow.tracking_uri = "sqlite:///mlruns.db"
     config.mlflow.experiment_name = "test_pipeline"
-    
+
     return config
 
 
@@ -282,16 +281,16 @@ def mock_pipeline_dependencies(sample_train_df, sample_val_df, sample_test_df, t
     train_path = tmp_path / "train.parquet"
     val_path = tmp_path / "val.parquet"
     test_path = tmp_path / "test.parquet"
-    
+
     sample_train_df.to_parquet(train_path)
     sample_val_df.to_parquet(val_path)
     sample_test_df.to_parquet(test_path)
-    
+
     return {"train": train_path, "val": val_path, "test": test_path}
 
 
 # =============================================================================
-# INTEGRATION TEST FIXTURES
+# E2E INTEGRATION TEST FIXTURES
 # =============================================================================
 
 @pytest.fixture
@@ -307,15 +306,15 @@ def e2e_processed_splits(sample_train_df, sample_val_df, sample_test_df, tmp_pat
     """Processed splits for E2E model training tests."""
     processed_dir = tmp_path / "processed"
     processed_dir.mkdir(parents=True, exist_ok=True)
-    
+
     train_path = processed_dir / "train.parquet"
     val_path = processed_dir / "val.parquet"
     test_path = processed_dir / "test.parquet"
-    
+
     sample_train_df.to_parquet(train_path)
     sample_val_df.to_parquet(val_path)
     sample_test_df.to_parquet(test_path)
-    
+
     return train_path, val_path, test_path
 
 
@@ -325,22 +324,26 @@ def mlflow_tracking_uri(tmp_path):
     uri = f"sqlite:///{tmp_path}/mlruns.db"
     return uri
 
+
 # =============================================================================
-# API / FASTAPI FIXTURES
+# API / FASTAPI FIXTURES (Unit Tests - Mocked)
 # =============================================================================
 
 @pytest.fixture
 def api_client():
     """Client for calling API endpoints."""
+    from src.api.app import app
     return TestClient(app)
+
 
 @pytest.fixture
 def mock_model_artifact():
     """Mock XGBoost/Sklearn model for unit tests."""
     model = MagicMock()
     # Mock predict_proba to return [0.8, 0.2] (not fraud)
-    model.predict_proba.return_value = np.array([[0.8, 0.2]]) 
+    model.predict_proba.return_value = np.array([[0.8, 0.2]])
     return model
+
 
 @pytest.fixture
 def mock_encoder_artifact():
@@ -350,47 +353,125 @@ def mock_encoder_artifact():
     encoder.transform.side_effect = lambda df: df
     return encoder
 
+
 @pytest.fixture
 def mock_feature_columns():
     """Mock feature columns list."""
     return [
-        "amount_inr", "log_amount", "hour", "day_of_week", "is_night", 
-        "is_weekend", "intl_online", "night_high_amount", 
+        "amount_inr", "log_amount", "hour", "day_of_week", "is_night",
+        "is_weekend", "intl_online", "night_high_amount",
         "merchant_category_encoded"
     ] + [f"V{i}" for i in range(1, 29)]
+
 
 @pytest.fixture
 def client_with_mocks(mock_model_artifact, mock_encoder_artifact, mock_feature_columns):
     """
-    TestClient that mocks the artifact loading (unit tests).
-    This prevents DVC files from being required.
+    TestClient that mocks artifact loading (unit tests).
+    Patches load_artifacts() to return mock objects instead of loading from MLflow/PVC.
     """
-    # Patch joblib.load to return our mocks instead of reading files
-    with patch("src.api.app.joblib.load") as mock_load:
-        def side_effect(path):
-            path_str = str(path)
-            if "model" in path_str:
-                return mock_model_artifact
-            elif "encoder" in path_str:
-                return mock_encoder_artifact
-            elif "feature_columns" in path_str:
-                return mock_feature_columns
-            return MagicMock()
-            
-        mock_load.side_effect = side_effect
-        
-        # Create client inside the patch context
+    with patch("src.api.app.load_artifacts") as mock_load:
+        # Return our mock artifacts (model, encoder, feature_columns)
+        mock_load.return_value = (
+            mock_model_artifact,
+            mock_encoder_artifact,
+            mock_feature_columns
+        )
+
+        # Import app AFTER patching to ensure lifespan uses mocks
+        from src.api.app import app
+
         with TestClient(app) as client:
             yield client
 
+
+# =============================================================================
+# API / FASTAPI FIXTURES (Integration Tests - Real Artifacts)
+# =============================================================================
+
 @pytest.fixture
-def client_integration():
+def integration_model_artifacts(tmp_path, sample_train_df):
     """
-    TestClient that uses REAL artifacts (Integration tests).
-    Requires DVC files to be present.
+    Create REAL (but small) model artifacts for integration testing.
+
+    This tests the actual loading/prediction logic without requiring:
+    - MLflow server running
+    - PVC files present
+    - Full training pipeline execution
+
+    Industry standard: Stripe, Airbnb, Netflix all use this pattern.
     """
-    with TestClient(app) as client:
-        yield client
+    from src.features.encoders import TargetEncoder
+
+    # 1. Prepare training data (from existing fixture)
+    X = sample_train_df.drop(columns=["is_fraud"])
+    y = sample_train_df["is_fraud"]
+
+    # 2. Create and fit a REAL encoder
+    encoder_df = pd.DataFrame({
+        "merchant_category": ["Retail", "Food", "Travel", "Electronics", "Retail"] * 20,
+    })
+    encoder_y = pd.Series([0, 0, 1, 0, 1] * 20)
+    encoder = TargetEncoder(column="merchant_category")
+    encoder.fit(encoder_df, encoder_y)
+
+    # 3. Get numeric columns only for model training
+    numeric_cols = X.select_dtypes(include=["number"]).columns.tolist()
+    X_numeric = X[numeric_cols].astype("float64")
+
+    # 4. Train a REAL (but simple) model
+    model = Pipeline([
+        ("scaler", StandardScaler()),
+        ("classifier", LogisticRegression(random_state=42, max_iter=200))
+    ])
+    model.fit(X_numeric, y)
+
+    # 5. Define feature columns (what the model expects)
+    feature_columns = numeric_cols
+
+    # 6. Save artifacts to temp directory
+    model_path = tmp_path / "model.joblib"
+    encoder_path = tmp_path / "encoder.joblib"
+    features_path = tmp_path / "features.joblib"
+
+    joblib.dump(model, model_path)
+    joblib.dump(encoder, encoder_path)
+    joblib.dump(feature_columns, features_path)
+
+    return {
+        "model": model,
+        "encoder": encoder,
+        "feature_columns": feature_columns,
+        "model_path": model_path,
+        "encoder_path": encoder_path,
+        "features_path": features_path,
+    }
+
+
+@pytest.fixture
+def client_with_real_artifacts(integration_model_artifacts):
+    """
+    TestClient that uses REAL (fixture-generated) artifacts.
+
+    Unlike client_with_mocks (uses MagicMock), this uses actual:
+    - Trained sklearn model
+    - Fitted TargetEncoder
+    - Real feature columns list
+
+    Tests the full prediction pipeline with real objects.
+    """
+    with patch("src.api.app.load_artifacts") as mock_load:
+        mock_load.return_value = (
+            integration_model_artifacts["model"],
+            integration_model_artifacts["encoder"],
+            integration_model_artifacts["feature_columns"],
+        )
+
+        from src.api.app import app
+
+        with TestClient(app) as client:
+            yield client
+
 
 @pytest.fixture
 def sample_transaction_payload():

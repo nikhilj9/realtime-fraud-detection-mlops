@@ -1,16 +1,17 @@
 # test_model_training.py
 """Tests for model training module."""
 
-import numpy as np
-import joblib
 from unittest.mock import patch
 
+import joblib
+import numpy as np
+
 from src.models.train import (
-    load_split_data,
     create_preprocessor,
-    train_model,
+    load_split_data,
     retrain_on_train_val,
     save_model,
+    train_model,
 )
 
 

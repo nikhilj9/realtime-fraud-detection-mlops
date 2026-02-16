@@ -1,6 +1,7 @@
 import pytest
 from fastapi import status
 
+
 @pytest.mark.unit
 def test_health_check(client_with_mocks):
     """Test /health endpoint. Does not need model."""
@@ -19,16 +20,16 @@ def test_predict_endpoint_mocked(client_with_mocks, sample_transaction_payload):
         "/api/v1/predict",
         json=sample_transaction_payload
     )
-    
+
     # 1. Check HTTP Status
     assert response.status_code == status.HTTP_200_OK
-    
+
     # 2. Check Response Structure
     data = response.json()
     assert "is_fraud" in data
     assert "fraud_probability" in data
     assert "risk_level" in data
-    
+
     # 3. Validate Logic (Our mock returns 0.2 probability)
     # Since 0.2 < 0.5, is_fraud should be False
     assert data["fraud_probability"] == 0.2
