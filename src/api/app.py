@@ -6,12 +6,12 @@ from pathlib import Path
 
 import joblib
 import mlflow
-from mlflow.tracking import MlflowClient
 from fastapi import FastAPI
+from mlflow.tracking import MlflowClient
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from src.utils.logger import get_logger, log_session_start, log_session_end
 from src.api.routes.predict import router as predict_router
+from src.utils.logger import get_logger, log_session_end, log_session_start
 
 logger = get_logger(__name__)
 

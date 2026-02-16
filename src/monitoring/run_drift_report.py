@@ -4,10 +4,10 @@ Standalone CLI for running drift detection reports.
 Usage:
     # Simulate mild drift (default)
     uv run python -m src.monitoring.run_drift_report
-    
+
     # Simulate severe drift
     uv run python -m src.monitoring.run_drift_report --simulate-drift severe
-    
+
     # Use custom current data file
     uv run python -m src.monitoring.run_drift_report --current-data path/to/current.parquet
 
@@ -47,17 +47,17 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    
+
     parser.add_argument(
         "--reference-data",
         type=Path,
         default=DEFAULT_REFERENCE_DATA,
         help=f"Path to reference (baseline) data. Default: {DEFAULT_REFERENCE_DATA}",
     )
-    
+
     # Mutually exclusive: either simulate drift OR provide current data
     data_source = parser.add_mutually_exclusive_group()
-    
+
     data_source.add_argument(
         "--simulate-drift",
         type=str,
@@ -65,34 +65,34 @@ def parse_args() -> argparse.Namespace:
         default="mild",
         help="Simulate drift scenario. Default: mild",
     )
-    
+
     data_source.add_argument(
         "--current-data",
         type=Path,
         default=None,
         help="Path to current (production) data. Overrides --simulate-drift",
     )
-    
+
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
         help=f"Directory to save HTML reports. Default: {DEFAULT_OUTPUT_DIR}",
     )
-    
+
     parser.add_argument(
         "--no-report",
         action="store_true",
         help="Skip saving HTML report (console output only)",
     )
-    
+
     parser.add_argument(
         "--reference-ratio",
         type=float,
         default=0.5,
         help="Ratio of data to use as reference when simulating. Default: 0.5",
     )
-    
+
     return parser.parse_args()
 
 
@@ -100,7 +100,7 @@ def load_parquet(path: Path) -> pd.DataFrame:
     """Load parquet file with error handling."""
     if not path.exists():
         raise FileNotFoundError(f"Data file not found: {path}")
-    
+
     df = pd.read_parquet(path)
     logger.info(f"Loaded {len(df)} rows from {path}")
     return df
@@ -109,20 +109,20 @@ def load_parquet(path: Path) -> pd.DataFrame:
 def main() -> int:
     """
     Main entry point for drift detection CLI.
-    
+
     Returns:
         Exit code (0=none, 1=warning, 2=critical, 3=error)
     """
     args = parse_args()
-    
+
     logger.info("=" * 60)
     logger.info("DRIFT DETECTION CLI")
     logger.info("=" * 60)
-    
+
     try:
         # Load source data
         source_df = load_parquet(args.reference_data)
-        
+
         # Determine reference and current data
         if args.current_data:
             # Mode: Real current data provided
@@ -132,17 +132,17 @@ def main() -> int:
         else:
             # Mode: Simulate drift
             logger.info(f"Simulating drift scenario: {args.simulate_drift}")
-            
+
             # Split source data into reference and current
             reference_df, current_df = split_data_for_drift(
                 source_df,
                 reference_ratio=args.reference_ratio,
             )
-            
+
             # Apply drift scenario to current data
             drift_type: DriftType = args.simulate_drift  # type: ignore
             current_df = apply_drift_scenario(current_df, drift_type)
-        
+
         # Run drift detection
         result = detect_drift(
             reference_df=reference_df,
@@ -150,7 +150,7 @@ def main() -> int:
             save_report=not args.no_report,
             output_dir=args.output_dir,
         )
-        
+
         # Determine exit code based on severity
         if result.severity == DriftSeverity.CRITICAL:
             logger.error("CRITICAL DRIFT DETECTED - Pipeline should STOP")
@@ -161,7 +161,7 @@ def main() -> int:
         else:
             logger.info("No significant drift detected")
             return 0
-            
+
     except FileNotFoundError as e:
         logger.error(f"File error: {e}")
         return 3

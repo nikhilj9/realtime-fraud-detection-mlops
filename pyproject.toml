@@ -39,3 +39,43 @@ dev = [
     "pytest-cov>=7.0.0",
     "ruff>=0.14.10",
 ]
+
+[tool.ruff]
+# Set line length to 100 (not default 88)
+line-length = 100
+target-version = "py312"
+
+# Exclude directories
+exclude = [
+    ".venv",
+    "__pycache__",
+    "*.pyc",
+    "gx",
+    "notebooks",
+    "docker",
+    "k8s",
+    ".pytest_cache",
+    "dist",
+    "build",
+    "mlruns",
+]
+
+[tool.ruff.lint]
+# Enable these rule groups
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+    "UP",  # pyupgrade (modern Python syntax)
+]
+
+# Ignore specific rules that conflict with MLflow/Prefect patterns
+ignore = [
+    "E501",  # Line too long (we handle with line-length setting)
+]
+
+[tool.ruff.lint.isort]
+# Import sorting configuration
+known-first-party = ["src"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]

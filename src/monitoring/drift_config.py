@@ -11,7 +11,7 @@ from enum import Enum
 
 class DriftSeverity(Enum):
     """Drift severity levels for pipeline decision-making."""
-    
+
     NONE = "none"          # No significant drift detected
     WARNING = "warning"    # Some drift, but acceptable - log and continue
     CRITICAL = "critical"  # Severe drift - should block pipeline
@@ -21,11 +21,11 @@ class DriftSeverity(Enum):
 class DriftThresholds:
     """
     Thresholds for drift severity classification.
-    
+
     Based on proportion of columns showing statistical drift.
     Uses frozen=True for immutability (production safety).
     """
-    
+
     warning: float = 0.2   # >20% columns drifted = WARNING
     critical: float = 0.5  # >50% columns drifted = CRITICAL
 

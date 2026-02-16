@@ -3,9 +3,9 @@
 from pathlib import Path
 from typing import Any
 
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
 
 from src.utils import get_logger
 from src.utils.exceptions import ModelPredictionError
@@ -17,7 +17,7 @@ def load_model(model_path: Path) -> Any:
     """Load model from disk."""
     if not model_path.exists():
         raise ModelPredictionError(f"Model not found: {model_path}")
-    
+
     model = joblib.load(model_path)
     logger.info(f"Loaded: {model_path}")
     return model
@@ -52,17 +52,17 @@ def batch_predict(
     threshold: float = 0.5
 ) -> None:
     """Batch prediction on file."""
-    
+
     df = pd.read_parquet(input_path)
-    
+
     if "is_fraud" in df.columns:
         df = df.drop(columns=["is_fraud"])
-    
+
     df["fraud_probability"] = predict_proba(model, df)
     df["is_fraud_predicted"] = (df["fraud_probability"] >= threshold).astype(int)
-    
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(output_path, index=False)
-    
+
     logger.info(f"Predictions saved: {output_path}")
     logger.info(f"Fraud detected: {df['is_fraud_predicted'].sum():,} / {len(df):,}")

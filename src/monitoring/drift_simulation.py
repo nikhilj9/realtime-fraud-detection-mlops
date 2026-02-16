@@ -25,12 +25,12 @@ def split_data_for_drift(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Split data into reference (baseline) and current (production) sets.
-    
+
     Args:
         df: Source dataframe
         reference_ratio: Proportion of data to keep as reference (0.0-1.0)
         seed: Random seed for reproducibility
-    
+
     Returns:
         Tuple of (reference_df, current_df)
     """
@@ -48,7 +48,7 @@ def split_data_for_drift(
         split_idx = int(len(df) * reference_ratio)
         reference_df = shuffled.iloc[:split_idx].copy()
         current_df = shuffled.iloc[split_idx:].copy()
-    
+
     return reference_df, current_df
 
 
@@ -60,13 +60,13 @@ def inject_numerical_drift(
 ) -> pd.DataFrame:
     """
     Shift numerical distribution by multiplying and/or adding offset.
-    
+
     new_value = (old_value * multiplier) + offset
     """
     if column not in df.columns:
         logger.warning(f"Column {column} not found, skipping drift injection")
         return df
-    
+
     df = df.copy()
     df[column] = (df[column] * multiplier) + offset
     logger.debug(f"Injected numerical drift on {column}: x{multiplier} + {offset}")
@@ -82,23 +82,23 @@ def inject_categorical_drift(
     """
     Replace values in a column with target_category with given probability.
     Simulates a category becoming more dominant.
-    
+
     Handles dtype conversion properly to avoid FutureWarning.
     """
     if column not in df.columns:
         logger.warning(f"Column {column} not found, skipping drift injection")
         return df
-    
+
     df = df.copy()
     mask = np.random.random(len(df)) < probability
-    
+
     # Convert column to object dtype first to avoid incompatible dtype warning
     # This is the proper way to handle mixed types in pandas 2.x
     if df[column].dtype != object:
         df[column] = df[column].astype(object)
-    
+
     df.loc[mask, column] = target_category
-    
+
     logger.debug(f"Injected categorical drift on {column}: {probability:.1%} -> {target_category}")
     return df
 
@@ -112,7 +112,7 @@ def inject_nulls(
     if column not in df.columns:
         logger.warning(f"Column {column} not found, skipping drift injection")
         return df
-    
+
     df = df.copy()
     mask = np.random.random(len(df)) < missing_ratio
     df.loc[mask, column] = None
@@ -126,43 +126,43 @@ def apply_drift_scenario(
 ) -> pd.DataFrame:
     """
     Apply a predefined drift scenario to the dataset.
-    
+
     Args:
         df: Input dataframe
         scenario: "none", "mild", or "severe"
-    
+
     Returns:
         Drifted dataframe
     """
     if scenario == "none":
         return df
-    
+
     df_drifted = df.copy()
     logger.info(f"Applying '{scenario}' drift scenario...")
-    
+
     if scenario == "mild":
         # Slight shift in transaction amounts (5% increase)
         df_drifted = inject_numerical_drift(df_drifted, "amount_inr", multiplier=1.05)
-        
+
         # Minor shift in channel usage
         df_drifted = inject_categorical_drift(
             df_drifted, "transaction_channel", "Online", 0.1
         )
-        
+
     elif scenario == "severe":
         # Major economic shift (50% increase + offset)
         df_drifted = inject_numerical_drift(df_drifted, "amount_inr", multiplier=1.5, offset=500)
-        
+
         # Data quality failure (20% missing cities)
         df_drifted = inject_nulls(df_drifted, "merchant_city", 0.2)
-        
+
         # Massive behavior change (40% shift to International)
         df_drifted = inject_categorical_drift(
             df_drifted, "is_international", True, 0.4
         )
-        
+
         # Feature drift in PCA components (simulating core pattern change)
         df_drifted = inject_numerical_drift(df_drifted, "V1", multiplier=1.2, offset=0.5)
         df_drifted = inject_numerical_drift(df_drifted, "V4", multiplier=0.8, offset=-0.5)
-        
+
     return df_drifted

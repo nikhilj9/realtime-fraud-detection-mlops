@@ -7,22 +7,20 @@ INTEGRATED WITH: MLflow (Experiment Tracking & Model Registry)
 import gc
 import os
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from dotenv import load_dotenv
 
-import pandas as pd
+import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
-import matplotlib.pyplot as plt
+import pandas as pd
+from dotenv import load_dotenv
 from prefect import flow, task
 from prefect.artifacts import create_markdown_artifact
 
 from src.data.generation import generate, save
 from src.features.engineering import run_feature_engineering
-from src.monitoring.drift_config import DriftSeverity
-from src.monitoring.drift_detection import detect_drift
-from src.monitoring.drift_simulation import split_data_for_drift
+from src.models.evaluate import plot_confusion_matrix
 from src.models.train import (
     final_evaluation,
     load_split_data,
@@ -30,7 +28,9 @@ from src.models.train import (
     save_model,
     train_model,
 )
-from src.models.evaluate import plot_confusion_matrix
+from src.monitoring.drift_config import DriftSeverity
+from src.monitoring.drift_detection import detect_drift
+from src.monitoring.drift_simulation import split_data_for_drift
 from src.utils import Config, get_logger, load_config
 from src.validation.expectations import SuiteType, validate_dataframe
 
@@ -45,11 +45,11 @@ logger = get_logger(__name__)
 def configure_mlflow_tracking() -> str:
     """
     Configure MLflow to use the correct tracking server.
-    
+
     Priority:
     1. MLFLOW_TRACKING_URI environment variable (if set)
     2. Default to localhost:5000 (for local development with port-forwarding)
-    
+
     In Kubernetes, the prefect-worker deployment sets MLFLOW_TRACKING_URI=http://mlflow:5000
     Locally, you must either:
       - Set MLFLOW_TRACKING_URI=http://localhost:5000, OR
@@ -72,27 +72,27 @@ def download_from_s3_if_needed(input_path: str) -> Path:
     """
     if str(input_path).startswith("s3://"):
         import boto3
-        
+
         # Parse S3 path: s3://bucket/key
         s3_path = str(input_path).replace("s3://", "")
         bucket, key = s3_path.split("/", 1)
-        
+
         local_path = Path(tempfile.gettempdir()) / Path(key).name
-        
+
         logger.info(f"Downloading {input_path} → {local_path}")
-        
+
         s3_client = boto3.client(
             's3',
             endpoint_url=os.getenv('MLFLOW_S3_ENDPOINT_URL'),
             aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
             aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
         )
-        
+
         s3_client.download_file(bucket, key, str(local_path))
         logger.info(f"Download complete: {local_path}")
-        
+
         return local_path
-    
+
     return Path(input_path)
 
 
@@ -107,11 +107,11 @@ def task_etl_process(raw_path: Path, processed_root: Path, config: Config) -> di
     2. Runs GENERATION to add IDs, Timestamps, and extra columns.
     3. Runs FEATURE ENGINEERING on the enriched data.
     4. Saves Versioned Parquet.
-    
+
     Returns:
         dict with keys: 'enriched_path', 'train', 'val', 'test'
     """
-    if not str(raw_path).startswith("s3:/"): 
+    if not str(raw_path).startswith("s3:/"):
         if not raw_path.exists():
             raise FileNotFoundError(f"Raw data not found at: {raw_path}")
 
@@ -119,17 +119,17 @@ def task_etl_process(raw_path: Path, processed_root: Path, config: Config) -> di
     date_str = datetime.now()
     version_dir = processed_root / f"{date_str.year}/{date_str.month:02d}/{date_str.day:02d}"
     version_dir.mkdir(parents=True, exist_ok=True)
-    
+
     config.paths.raw_data = raw_path
 
     # Step 1: Enrich raw data (31 cols → 46 cols)
     logger.info(f"Step 1: Enriching raw data from {raw_path}")
     enriched_df = generate(config)
-    
+
     # Step 2: Save enriched data
     output_file = version_dir / config.generation.output_filename
     save(enriched_df, output_file)
-    
+
     # Step 3: Feature engineering on enriched data
     # NOW we capture the returned paths instead of discarding them
     logger.info(f"Step 2: Running feature engineering on {output_file}")
@@ -139,7 +139,7 @@ def task_etl_process(raw_path: Path, processed_root: Path, config: Config) -> di
         train_ratio=config.split.train_ratio,
         val_ratio=config.split.val_ratio,
     )
-    
+
     # Return both the enriched parquet path AND the train/val/test paths
     return {
         "enriched_path": output_file,
@@ -163,13 +163,13 @@ def task_validate_raw_data(data_path: Path) -> pd.DataFrame:
         df = pd.read_csv(data_path)
     else:
         raise ValueError(f"Unsupported file format: {data_path.suffix}")
-    
+
     success, errors = validate_dataframe(df, suite_type=SuiteType.PROCESSED)
-    
+
     if not success:
         error_msg = f"Data validation failed with {len(errors)} errors: {errors}"
         raise ValueError(error_msg)
-        
+
     return df
 
 
@@ -177,21 +177,21 @@ def task_validate_raw_data(data_path: Path) -> pd.DataFrame:
 def task_check_drift(df: pd.DataFrame) -> None:
     """Checks for drift. Fails flow if CRITICAL drift detected."""
     reference_df, current_df = split_data_for_drift(df, reference_ratio=0.5)
-    
+
     # Delete the original df - we only need the two halves now
     del df
     gc.collect()
-    
+
     result = detect_drift(
-        reference_df=reference_df, 
-        current_df=current_df, 
+        reference_df=reference_df,
+        current_df=current_df,
         save_report=True
     )
-    
+
     # Free drift dataframes immediately after analysis
     del reference_df, current_df
     gc.collect()
-    
+
     markdown_report = f"""
     # Drift Detection Report
     - **Drift Ratio**: {result.drift_ratio:.1%}
@@ -234,7 +234,7 @@ def task_retrain(X_train, y_train, X_val, y_val, config: Config):
 def task_evaluate(model, X_test, y_test, config: Config):
     metrics = final_evaluation(model, X_test, y_test, config)
     logger.info(f"Test Metrics: {metrics}")
-    
+
     create_markdown_artifact(
         key="model-metrics",
         markdown=f"### Test Results\nPR-AUC: {metrics['pr_auc']:.4f}",
@@ -261,15 +261,15 @@ def task_mlflow_training(
 ) -> Path:
     """
     Runs training inside an MLflow run context.
-    
+
     Separated as a task to ensure clean MLflow state management.
     Each task runs in isolation, preventing run state from leaking.
     """
     run_name = f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    
+
     with mlflow.start_run(run_name=run_name) as run:
         logger.info(f"MLflow Run ID: {run.info.run_id}")
-        
+
         # Log hyperparameters
         mlflow.log_params({
             "model_type": config.model.model_type,
@@ -290,19 +290,19 @@ def task_mlflow_training(
 
         # Train initial model
         _, val_metrics = train_model(X_train, y_train, X_val, y_val, config)
-        
+
         mlflow.log_metrics({
             "val_pr_auc": val_metrics["pr_auc"],
             "val_f1": val_metrics["f1_score"],
             "val_roc_auc": val_metrics["roc_auc"]
         })
-        
+
         # Retrain on train+val
         final_model = retrain_on_train_val(X_train, y_train, X_val, y_val, config)
-        
+
         # Final evaluation on test set
         test_metrics = final_evaluation(final_model, X_test, y_test, config)
-        
+
         mlflow.log_metrics({
             "test_pr_auc": test_metrics["pr_auc"],
             "test_f1": test_metrics["f1_score"],
@@ -310,14 +310,14 @@ def task_mlflow_training(
             "test_precision": test_metrics["precision"],
             "test_recall": test_metrics["recall"]
         })
-        
+
         # Generate and log confusion matrix artifact
         y_pred = final_model.predict(X_test)
         fig = plot_confusion_matrix(y_test.values, y_pred, title="Test Confusion Matrix")
         mlflow.log_figure(fig, "confusion_matrix.png")
         plt.close(fig)
         logger.info("Logged confusion_matrix.png to MLflow")
-        
+
         # Log preprocessing artifacts to MLflow
         if encoder_path:
             mlflow.log_artifact(str(encoder_path), "preprocessing")
@@ -325,10 +325,10 @@ def task_mlflow_training(
         if features_path:
             mlflow.log_artifact(str(features_path), "preprocessing")
             logger.info("Logged feature_columns.joblib to MLflow")
-        
+
         # Save model locally (for API to load from PVC)
         model_path = config.paths.models / "champion_model.joblib"
-        
+
         # Convert category columns to string for MLflow schema inference
         input_example = X_test.head(1).copy()
         for col in input_example.select_dtypes(include=["category"]).columns:
@@ -343,9 +343,9 @@ def task_mlflow_training(
             registered_model_name="fraud-detection-model",
             input_example=input_example,
         )
-        
+
         logger.info(f"Model saved to {model_path} and registered in MLflow")
-        
+
         return model_path
 
 
@@ -360,11 +360,11 @@ def training_flow(config_path: str = "src/config/config.yaml", skip_drift: bool 
     Logs experiments to MLflow.
     """
     config = load_config(Path(config_path))
-    
+
     # Step 0: Configure MLflow tracking (THE FIX)
     # This MUST happen before any MLflow operations
     configure_mlflow_tracking()
-    
+
     # Set experiment (now it talks to PostgreSQL, not local filesystem)
     experiment_name = config.mlflow.experiment_name if hasattr(config, "mlflow") else "fraud-detection"
     mlflow.set_experiment(experiment_name)
@@ -372,7 +372,7 @@ def training_flow(config_path: str = "src/config/config.yaml", skip_drift: bool 
 
     # Step 1: Download raw data from MinIO if needed
     raw_input = download_from_s3_if_needed(config.paths.raw_data)
-    
+
     # Step 2: ETL (enrich + feature engineering)
     # Now returns dict with enriched_path AND train/val/test paths
     logger.info("Starting ETL: enrich raw data + feature engineering...")
@@ -383,7 +383,7 @@ def training_flow(config_path: str = "src/config/config.yaml", skip_drift: bool 
     )
     gc.collect()
     logger.info(f"ETL complete. Output paths: train={etl_output['train']}, val={etl_output['val']}, test={etl_output['test']}")
-    
+
     # Step 3: Validation (on enriched parquet)
     validated_df = task_validate_raw_data(etl_output["enriched_path"])
     logger.info(f"Validation passed. Shape: {validated_df.shape}")
@@ -394,7 +394,7 @@ def training_flow(config_path: str = "src/config/config.yaml", skip_drift: bool 
 
     del validated_df
     gc.collect()
-    
+
     # Step 5: Load train/val/test splits (using paths from ETL)
     X_train, y_train, X_val, y_val, X_test, y_test = task_load_data(etl_output)
 
@@ -404,7 +404,7 @@ def training_flow(config_path: str = "src/config/config.yaml", skip_drift: bool 
         encoder_path=etl_output.get("encoder"),
         features_path=etl_output.get("features"),
     )
-    
+
     logger.info(f"Pipeline complete. Model saved to: {saved_path}")
 
 

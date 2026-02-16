@@ -1,42 +1,43 @@
 """Request and response schemas for fraud prediction API."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
-from typing import Optional, Literal
 
 
 class TransactionRequest(BaseModel):
     """
     Transaction data for fraud prediction.
-    
+
     Must include all features the model was trained on.
     """
-    
+
     # === Transaction basics ===
     amount: float = Field(..., gt=0, description="Transaction amount")
     time: float = Field(..., ge=0, description="Seconds since first transaction")
-    
+
     # === Card information ===
     card_tier: Literal["Classic", "Gold", "Platinum", "Signature"] = Field(
-    ..., 
+    ...,
     description="Card tier: Classic, Gold, Platinum, or Signature")
 
     credit_limit: float = Field(..., gt=0, description="Customer credit limit")
     card_age: int = Field(..., ge=0, description="Card age in days")
-    
+
     # === Transaction context ===
     transaction_channel: Literal["Online", "POS"] = Field(
-        ..., 
+        ...,
         description="Channel: Online or POS"
     )
     is_international: int = Field(..., ge=0, le=1, description="1 if international, 0 otherwise")
     is_recurring: int = Field(..., ge=0, le=1, description="1 if recurring payment, 0 otherwise")
-    
+
     # === For target encoding ===
-    merchant_category: Optional[str] = Field(
-        default=None, 
+    merchant_category: str | None = Field(
+        default=None,
         description="Merchant category for encoding (e.g., 'grocery', 'electronics')"
     )
-    
+
     # === PCA components (V1-V28) ===
     V1: float
     V2: float
@@ -113,11 +114,11 @@ class TransactionRequest(BaseModel):
 
 class PredictionResponse(BaseModel):
     """Fraud prediction result."""
-    
+
     is_fraud: bool = Field(..., description="True if predicted as fraudulent")
     fraud_probability: float = Field(..., ge=0, le=1, description="Probability of fraud (0-1)")
     risk_level: str = Field(..., description="Risk category: low, medium, or high")
-    
+
     class Config:
         json_schema_extra = {
             "example": {

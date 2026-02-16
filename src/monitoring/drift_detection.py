@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from evidently import Dataset, DataDefinition, Report
+from evidently import DataDefinition, Dataset, Report
 from evidently.presets import DataDriftPreset
 
 from src.monitoring.drift_config import (
@@ -49,7 +49,7 @@ logger = get_logger(__name__)
 class DriftDetectionResult:
     """
     Result of drift detection analysis.
-    
+
     Attributes:
         severity: Overall drift severity (NONE, WARNING, CRITICAL)
         drifted_columns: List of column names that showed drift
@@ -69,7 +69,7 @@ class DriftDetectionResult:
 def create_data_definition() -> DataDefinition:
     """
     Create Evidently DataDefinition from our column configuration.
-    
+
     Maps numerical and categorical columns for appropriate
     statistical tests (KS for numerical, chi-squared for categorical).
     """
@@ -85,17 +85,17 @@ def create_datasets(
 ) -> tuple[Dataset, Dataset]:
     """
     Create Evidently Dataset objects from pandas DataFrames.
-    
+
     Filters to only monitored columns to avoid errors with
     ID columns, timestamps, etc.
     """
     data_definition = create_data_definition()
-    
+
     existing_cols = set(reference_df.columns)
     monitored_cols = [c for c in ALL_MONITORED_COLUMNS if c in existing_cols]
-    
+
     logger.debug(f"Creating datasets with {len(monitored_cols)} monitored columns")
-    
+
     reference_dataset = Dataset.from_pandas(
         reference_df[monitored_cols],
         data_definition=data_definition,
@@ -104,14 +104,14 @@ def create_datasets(
         current_df[monitored_cols],
         data_definition=data_definition,
     )
-    
+
     return current_dataset, reference_dataset
 
 
 def parse_drift_from_json(json_str: str, threshold: float = 0.05) -> dict[str, Any]:
     """
     Parse Evidently 0.7.18 JSON structure to extract drift information.
-    
+
     In 0.7.18, the JSON structure is:
     {
         "metrics": [
@@ -122,11 +122,11 @@ def parse_drift_from_json(json_str: str, threshold: float = 0.05) -> dict[str, A
             ...
         ]
     }
-    
+
     Args:
         json_str: Raw JSON string from snapshot.json()
         threshold: P-value threshold for drift detection (default: 0.05)
-    
+
     Returns:
         dict with keys:
             - 'total_columns': int
@@ -135,39 +135,39 @@ def parse_drift_from_json(json_str: str, threshold: float = 0.05) -> dict[str, A
     """
     data = json.loads(json_str)
     metrics = data.get("metrics", [])
-    
+
     result = {
         "total_columns": 0,
         "drifted_columns": [],
         "column_scores": {},
     }
-    
+
     for m in metrics:
         metric_name = m.get("metric_name", "")
         value = m.get("value")
-        
+
         # Extract per-column drift from ValueDrift metrics
         if "ValueDrift" in metric_name:
             # Parse column name from: "ValueDrift(column=amount,method=...)"
             match = re.search(r"column=([^,\)]+)", metric_name)
             if match:
                 col_name = match.group(1)
-                
+
                 # Extract threshold from metric_name if present
                 threshold_match = re.search(r"threshold=([0-9.]+)", metric_name)
                 col_threshold = float(threshold_match.group(1)) if threshold_match else threshold
-                
+
                 # Value is the p-value (float)
                 p_value = float(value) if value is not None else 1.0
-                
+
                 result["column_scores"][col_name] = p_value
-                
+
                 # Drift detected if p-value < threshold
                 if p_value < col_threshold:
                     result["drifted_columns"].append(col_name)
-    
+
     result["total_columns"] = len(result["column_scores"])
-    
+
     return result
 
 
@@ -180,20 +180,20 @@ def detect_drift(
 ) -> DriftDetectionResult:
     """
     Main entry point for drift detection.
-    
+
     Compares current data distribution against reference (baseline) data
     and determines drift severity based on the proportion of drifted columns.
-    
+
     Args:
         reference_df: Baseline data (e.g., training data distribution)
         current_df: Current data to compare against baseline
         save_report: Whether to save HTML report
         output_dir: Directory for HTML reports
         thresholds: Threshold configuration for severity levels
-    
+
     Returns:
         DriftDetectionResult with severity, drifted columns, and scores
-    
+
     Example:
         >>> result = detect_drift(training_df, production_df)
         >>> if result.severity == DriftSeverity.CRITICAL:
@@ -210,7 +210,7 @@ def detect_drift(
 
     # 2. Configure and Run Report
     report = Report([DataDriftPreset()])
-    
+
     logger.info("Running drift analysis...")
     snapshot = report.run(reference_data=reference_ds, current_data=current_ds)
     logger.info("Drift analysis complete")
@@ -221,14 +221,14 @@ def detect_drift(
 
     # 3. Parse Results from Snapshot JSON
     drift_info = parse_drift_from_json(snapshot.json())
-    
+
     total_columns = drift_info["total_columns"]
     drifted_columns = drift_info["drifted_columns"]
     column_scores = drift_info["column_scores"]
 
     # 4. Calculate Severity
     drift_ratio = len(drifted_columns) / total_columns if total_columns > 0 else 0.0
-    
+
     if drift_ratio >= thresholds.critical:
         severity = DriftSeverity.CRITICAL
     elif drift_ratio >= thresholds.warning:
@@ -242,14 +242,14 @@ def detect_drift(
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        
+
         # Always save JSON (lightweight, ~100KB)
         json_report_path = output_path / f"drift_report_{timestamp}.json"
         with open(json_report_path, "w") as f:
             f.write(snapshot.json())
         logger.info(f"JSON report saved: {json_report_path}")
         report_path = json_report_path
-        
+
         # HTML is memory-intensive (~2-3GB spike for 41 columns)
         # Only generate if DRIFT_SAVE_HTML=true (skip in K8s by default)
         if os.getenv("DRIFT_SAVE_HTML", "false").lower() == "true":
@@ -266,12 +266,12 @@ def detect_drift(
     logger.info(f"  - Columns drifted: {len(drifted_columns)}")
     logger.info(f"  - Drift ratio: {drift_ratio:.1%}")
     logger.info(f"  - Severity: {severity.value.upper()}")
-    
+
     if drifted_columns:
         display_cols = drifted_columns[:5]
         suffix = f"... (+{len(drifted_columns) - 5} more)" if len(drifted_columns) > 5 else ""
         logger.info(f"  - Drifted: {display_cols}{suffix}")
-    
+
     logger.info("=" * 60)
 
     return DriftDetectionResult(

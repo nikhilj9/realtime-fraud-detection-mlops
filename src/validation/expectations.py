@@ -14,8 +14,8 @@ import great_expectations as gx
 import pandas as pd
 from great_expectations.data_context import AbstractDataContext
 from great_expectations.expectations import (
-    ExpectColumnValuesToBeInSet,
     ExpectColumnValuesToBeBetween,
+    ExpectColumnValuesToBeInSet,
     ExpectColumnValuesToNotBeNull,
     ExpectTableColumnsToMatchSet,
 )

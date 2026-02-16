@@ -1,31 +1,32 @@
 """Configuration management with Pydantic validation."""
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class PathConfig(BaseModel):
     """File paths configuration."""
-    raw_data: str 
+    raw_data: str
     processed_data: Path = Path("data/processed")
     models: Path = Path("models")
     logs: Path = Path("logs")
-    
+
     @field_validator("raw_data")
     @classmethod
     def check_raw_exists(cls, v: str) -> str:
         # 1. Check if it's an S3 URI (double or single slash just in case)
         if v.startswith("s3://") or v.startswith("s3:/"):
-            return v  
-            
+            return v
+
         # 2. Otherwise, check if local file exists
         if not Path(v).exists():
             raise ValueError(f"Raw data not found: {v}")
         return v
-    
+
     def ensure_dirs(self) -> None:
         """Create output directories."""
         self.processed_data.mkdir(parents=True, exist_ok=True)
@@ -38,7 +39,7 @@ class SplitConfig(BaseModel):
     train_ratio: float = Field(default=0.6, gt=0, lt=1)
     val_ratio: float = Field(default=0.2, gt=0, lt=1)
     test_ratio: float = Field(default=0.2, gt=0, lt=1)
-    
+
     @model_validator(mode="after")
     def validate_ratios(self) -> "SplitConfig":
         total = self.train_ratio + self.val_ratio + self.test_ratio
@@ -59,10 +60,10 @@ class GenerationParams(BaseModel):
 
 class DistributionConfig(BaseModel):
     """Probability distribution for categorical assignment."""
-    low_amount: Dict[str, float]
-    mid_amount: Dict[str, float]
-    high_amount: Dict[str, float]
-    
+    low_amount: dict[str, float]
+    mid_amount: dict[str, float]
+    high_amount: dict[str, float]
+
     @model_validator(mode="after")
     def validate_probabilities(self) -> "DistributionConfig":
         for name in ["low_amount", "mid_amount", "high_amount"]:
@@ -90,8 +91,8 @@ class ModelParams(BaseModel):
     subsample: float = Field(default=0.8, gt=0, le=1)
     colsample_bytree: float = Field(default=0.8, gt=0, le=1)
     smote_ratio: float = Field(default=0.1, gt=0, le=1)
-    
-    def to_xgb_params(self) -> Dict[str, Any]:
+
+    def to_xgb_params(self) -> dict[str, Any]:
         """Return XGBoost params dict."""
         return {
             "n_estimators": self.n_estimators,
@@ -109,13 +110,13 @@ class MLflowConfig(BaseSettings):
     """MLflow tracking configuration."""
     experiment_name: str = Field(default="fraud-detection")
     tracking_uri: str = Field(
-        default="mlruns", 
+        default="mlruns",
         validation_alias="MLFLOW_TRACKING_URI"
     )
     log_models: bool = True
     # This inner class tells Pydantic to read from the .env file
     model_config = SettingsConfigDict(
-        env_file=".env", 
+        env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore" # Ignores other variables in .env not defined here
     )
@@ -126,7 +127,7 @@ class Config(BaseModel):
     paths: PathConfig
     split: SplitConfig = SplitConfig()
     generation: GenerationParams = GenerationParams()
-    distributions: Optional[Dict[str, DistributionConfig]] = None
+    distributions: dict[str, DistributionConfig] | None = None
     features: FeatureConfig = FeatureConfig()
     model: ModelParams = ModelParams()
     mlflow: MLflowConfig = MLflowConfig()
@@ -135,18 +136,18 @@ class Config(BaseModel):
 def load_config(config_path: Path) -> Config:
     """Load and validate config from YAML file."""
     from src.utils.exceptions import ConfigurationError
-    
+
     if not config_path.exists():
         raise ConfigurationError(f"Config file not found: {config_path}")
-    
+
     try:
         with open(config_path) as f:
             raw = yaml.safe_load(f)
-        
+
         config = Config(**raw)
         config.paths.ensure_dirs()
-        
+
         return config
-    
+
     except Exception as e:
         raise ConfigurationError(f"Invalid config: {e}") from e
